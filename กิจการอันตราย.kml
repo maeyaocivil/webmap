@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Document>
+	<name>กิจการอันตราย.kml</name>
+	<Schema name="กิจการอันตราย" id="กิจการอันตราย">
+		<SimpleField type="string" name="ชื่อ - สกุล"></SimpleField>
+		<SimpleField type="string" name="ชื่อสถานประกอบกิจการ"></SimpleField>
+		<SimpleField type="string" name="กิจการรวม"></SimpleField>
+		<SimpleField type="int" name="X"></SimpleField>
+		<SimpleField type="int" name="Y"></SimpleField>
+	</Schema>
+	<Folder>
+		<name>กิจการอันตราย</name>
+		<Placemark>
+			<ExtendedData>
+				<SchemaData schemaUrl="#กิจการอันตราย">
+					<SimpleData name="ชื่อ - สกุล">นายแสวง คำภีระ</SimpleData>
+					<SimpleData name="ชื่อสถานประกอบกิจการ">-</SimpleData>
+					<SimpleData name="กิจการรวม">สะสมก๊าซ (ไม่เกิน 100 ตร.ม)</SimpleData>
+					<SimpleData name="X">581507</SimpleData>
+					<SimpleData name="Y">2205664</SimpleData>
+				</SchemaData>
+			</ExtendedData>
+			<Point>
+				<coordinates>99.77890151575269,19.9457226973137,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<ExtendedData>
+				<SchemaData schemaUrl="#กิจการอันตราย">
+					<SimpleData name="ชื่อ - สกุล">นายแสวง คำภีระ</SimpleData>
+					<SimpleData name="ชื่อสถานประกอบกิจการ">-</SimpleData>
+					<SimpleData name="กิจการรวม">สะสมน้ำมัน (400 ลิตร)</SimpleData>
+					<SimpleData name="X">581557</SimpleData>
+					<SimpleData name="Y">2205587</SimpleData>
+				</SchemaData>
+			</ExtendedData>
+			<Point>
+				<coordinates>99.7793758809764,19.9450248367843,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<ExtendedData>
+				<SchemaData schemaUrl="#กิจการอันตราย">
+					<SimpleData name="ชื่อ - สกุล">ปางช้างบ้านกะเหรี่ยงรวมมิตร</SimpleData>
+					<SimpleData name="ชื่อสถานประกอบกิจการ">ปางช้างบ้านกะเหรี่ยงรวมมิตร</SimpleData>
+					<SimpleData name="กิจการรวม">เลี้ยงและรวบรวมสัตว์(ช้าง) (13 เชือก)</SimpleData>
+					<SimpleData name="X">573755</SimpleData>
+					<SimpleData name="Y">2207377</SimpleData>
+				</SchemaData>
+			</ExtendedData>
+			<Point>
+				<coordinates>99.7048945819831,19.9615108604107,0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<ExtendedData>
+				<SchemaData schemaUrl="#กิจการอันตราย">
+					<SimpleData name="ชื่อ - สกุล">นายนฤเทพ ธีรวุฒิโรจน์</SimpleData>
+					<SimpleData name="ชื่อสถานประกอบกิจการ">อาข่าคอทเทจ</SimpleData>
+					<SimpleData name="กิจการรวม">เลี้ยงและรวบรวมสัตว์(แกะ) (41 ตัว)</SimpleData>
+					<SimpleData name="X">583348</SimpleData>
+					<SimpleData name="Y">2205617</SimpleData>
+				</SchemaData>
+			</ExtendedData>
+			<Point>
+				<coordinates>99.79649119061401,19.9452199912451,0</coordinates>
+			</Point>
+		</Placemark>
+		<atom:link rel="app" href="https://www.google.com/earth/about/versions/#earth-pro" title="Google Earth Pro 7.3.6.10201"></atom:link>
+	</Folder>
+</Document>
+</kml>
