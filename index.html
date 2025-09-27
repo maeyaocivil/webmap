@@ -1,79 +1,50 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title>WebMap Chiang Rai</title>
+  <meta charset="utf-8" />
+  <title>แผนที่โครงการ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
-
   <style>
-    #map { height: 100vh; width: 100%; }
+    #map { height: 100vh; margin: 0; padding: 0; }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
-  <script src="https://unpkg.com/omnivore/leaflet-omnivore.min.js"></script>
-
+  <script src="https://unpkg.com/leaflet-omnivore/leaflet-omnivore.min.js"></script>
   <script>
-    // สร้างแผนที่
-    const map = L.map('map').setView([19.9, 99.8], 11);
+    const map = L.map('map').setView([19.9, 99.8], 12);
 
-    // Base maps
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    // 🗺 Base layers
+    const baseLayers = {
+      "แผนที่ถนน (OSM)": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 20,
+        attribution: "© OpenStreetMap"
+      }).addTo(map),
 
-    const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      subdomains: ['mt0','mt1','mt2','mt3'],
-      attribution: '&copy; Google'
-    });
-
-    const baseMaps = {
-      "OSM": osm,
-      "Google ดาวเทียม": googleSat
+      "ภาพถ่ายดาวเทียม (Google)": L.tileLayer("http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
+        maxZoom: 20,
+        subdomains: ["mt0","mt1","mt2","mt3"]
+      })
     };
 
-    const overlayMaps = {};
+    const overlayLayers = {};
 
-    // โหลดชั้นข้อมูลจาก layers.json
-    fetch('layers.json')
+    // 📂 โหลดไฟล์ layers.json
+    fetch("layers.json")
       .then(res => res.json())
-      .then(layers => {
-        layers.forEach(layer => {
-          const kmlLayer = omnivore.kml(layer.file, null, L.geoJSON(null, {
-            style: { color: layer.color },
-            onEachFeature: function (feature, lyr) {
-              if (feature.properties) {
-                const popupContent = Object.keys(feature.properties)
-                  .map(k => `<b>${k}</b>: ${feature.properties[k]}`)
-                  .join("<br>");
-                lyr.bindPopup(popupContent);
-              }
-            }
-          }));
-
-          overlayMaps[layer.name] = kmlLayer;
-        });
-
-        // เพิ่ม Layer control
-        L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
-      });
-
-    // ปุ่มหาตำแหน่งผู้ใช้
-    L.control.locate({
-      position: 'topleft',
-      strings: {
-        title: "หาตำแหน่งของฉัน"
-      },
-      flyTo: true
-    }).addTo(map);
-  </script>
-</body>
-</html>
+      .then(data => {
+        data.forEach(layer => {
+          const kmlLayer = omnivore.kml(layer.url)
+            .on("ready", function() {
+              // ตั้งค่า style สี
+              this.setStyle({
+                color: layer.color,
+                weight: 3
+              });
+              // popup ตามชื่อชั้น
+              this.eachLayer(l => {
