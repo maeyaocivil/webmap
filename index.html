@@ -59,7 +59,7 @@
       attribution: '© Google'
     });
 
-    // ✅ control สำหรับ base map แยกออกไป
+    // ✅ control สำหรับ base map
     L.control.layers(
       { "OSM": osm, "Google ดาวเทียม": googleSat }, 
       {}
@@ -70,18 +70,29 @@
       .then(res => res.json())
       .then(layers => {
         layers.forEach(layer => {
-          const kmlLayer = omnivore.kml(layer.file, null, L.geoJSON(null, {
-            style: { color: layer.color, weight: 2 },
-            onEachFeature: function (feature, layerObj) {
-              if (feature.properties) {
-                let popupContent = '';
-                for (let key in feature.properties) {
-                  popupContent += `<b>${key}</b>: ${feature.properties[key]}<br>`;
-                }
-                layerObj.bindPopup(popupContent || layer.name);
+          const kmlLayer = omnivore.kml(layer.file);
+
+          // style ของชั้นข้อมูล
+          kmlLayer.on('ready', function() {
+            kmlLayer.eachLayer(function(featureLayer) {
+              if (featureLayer.setStyle) {
+                featureLayer.setStyle({ color: layer.color, weight: 2 });
               }
-            }
-          }));
+              if (featureLayer.feature && featureLayer.feature.properties) {
+                let props = featureLayer.feature.properties;
+                let popupContent = '';
+                for (let key in props) {
+                  popupContent += `<b>${key}</b>: ${props[key]}<br>`;
+                }
+                featureLayer.bindPopup(popupContent || layer.name);
+              } else {
+                featureLayer.bindPopup(layer.name);
+              }
+            });
+            console.log(layer.name + " โหลดสำเร็จ");
+          }).on('error', function(e) {
+            console.error("โหลด " + layer.file + " ไม่ได้", e);
+          });
 
           // เพิ่ม checkbox สำหรับเปิด/ปิด
           const checkbox = document.createElement('input');
