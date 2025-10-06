@@ -22,10 +22,10 @@
   <script src="https://unpkg.com/omnivore/leaflet-omnivore.min.js"></script>
 
   <script>
-    // สร้างแผนที่
+    // สร้างแผนที่เริ่มต้น
     const map = L.map('map').setView([19.9, 99.8], 11);
 
-    // Base maps
+    // ฐานแผนที่
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
@@ -36,8 +36,8 @@
     });
 
     const baseMaps = {
-      "OSM": osm,
-      "Google ดาวเทียม": googleSat
+      "แผนที่ถนน (OSM)": osm,
+      "แผนที่ดาวเทียม (Google)": googleSat
     };
 
     const overlayMaps = {};
@@ -47,33 +47,10 @@
       .then(res => res.json())
       .then(layers => {
         layers.forEach(layer => {
+          // โหลดแต่ละไฟล์ KML พร้อมสี
           const kmlLayer = omnivore.kml(layer.url, null, L.geoJSON(null, {
-            style: { color: layer.color },
-            onEachFeature: function (feature, lyr) {
-              if (feature.properties) {
-                const popupContent = Object.keys(feature.properties)
-                  .map(k => `<b>${k}</b>: ${feature.properties[k]}`)
-                  .join("<br>");
-                lyr.bindPopup(popupContent);
-              }
-            }
+            style: { color: layer.color }
           }));
 
           overlayMaps[layer.name] = kmlLayer;
         });
-
-        // เพิ่ม Layer control
-        L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
-      });
-
-    // ปุ่มหาตำแหน่งผู้ใช้
-    L.control.locate({
-      position: 'topleft',
-      strings: {
-        title: "หาตำแหน่งของฉัน"
-      },
-      flyTo: true
-    }).addTo(map);
-  </script>
-</body>
-</html>
