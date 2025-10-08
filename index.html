@@ -1,116 +1,25 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="utf-8" />
-<title>WebMap - เทศบาลตำบลแม่ยาว</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
-
-<style>
-  html, body { height: 100%; margin: 0; }
-  #map { height: 100%; width: 100%; }
-
-  /* ปุ่มเปิดปิดแผงควบคุม */
-  #toggleBtn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: white;
-    border: 1px solid #999;
-    padding: 6px 12px;
-    border-radius: 6px;
-    z-index: 1001;
-    cursor: pointer;
-    box-shadow: 0 0 5px rgba(0,0,0,0.3);
-    font-family: "Sarabun", sans-serif;
-  }
-
-  /* กล่องแผงข้อมูล */
-  .layer-control {
-    position: absolute;
-    top: 50px;
-    right: 10px;
-    background: white;
-    padding: 10px;
-    max-height: 85vh;
-    overflow-y: auto;
-    border-radius: 8px;
-    box-shadow: 0 0 8px rgba(0,0,0,0.4);
-    width: 300px;
-    font-family: "Sarabun", sans-serif;
-    z-index: 1000; /* สำคัญมาก ป้องกันโดนแผนที่ทับ */
-    display: none; /* เริ่มต้นซ่อน */
-  }
-
-  .layer-group-title {
-    font-weight: bold;
-    background: #e0e0e0;
-    padding: 6px;
-    margin: 5px 0;
-    border-radius: 5px;
-  }
-
-  .layer-item {
-    margin-left: 10px;
-    margin-bottom: 8px;
-  }
-
-  .slider-container {
-    margin: 2px 0 4px 20px;
-    font-size: 0.85em;
-    color: #333;
-  }
-
-  .slider-container input[type="range"] {
-    width: 85%;
-  }
-
-  .basemap-btn {
-    display: inline-block;
-    background: #f2f2f2;
-    border: 1px solid #ccc;
-    padding: 4px 8px;
-    margin: 2px;
-    border-radius: 5px;
-    cursor: pointer;
-  }
-
-  .basemap-btn.active {
-    background: #d1e7ff;
-    border-color: #007bff;
-  }
-</style>
-</head>
-<body>
-<div id="map"></div>
-<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
-
-<div class="layer-control" id="layerControl">
-  <h3>🗺️ แผนที่ฐาน</h3>
-  <div id="basemaps"></div>
-  <h3>📚 ชั้นข้อมูล</h3>
-  <div id="layerList"></div>
-</div>
-
 <script>
 const map = L.map('map').setView([19.95, 99.80], 12);
 
-// 🗺️ แผนที่ฐาน
+// 🗺️ แผนที่ฐาน (เพิ่ม Google Satellite และ Hybrid)
 const baseLayers = {
-  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 })
+  "Google Hybrid": L.tileLayer('https://mt1.google.com/vt/lyrs=h&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }), // ดาวเทียม + ถนน/ชื่อ (แนะนำ)
+  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }), // ดาวเทียมล้วน
+  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }), // ถนน
+  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }) // OSM
 };
-baseLayers["OpenStreetMap"].addTo(map);
+
+// ⭐️ ตั้งค่าแผนที่เริ่มต้นเป็น Google Hybrid
+const defaultLayerKey = "Google Hybrid";
+baseLayers[defaultLayerKey].addTo(map);
 
 // แสดงปุ่มเลือกแผนที่ฐาน
 const basemapsDiv = document.getElementById('basemaps');
-Object.keys(baseLayers).forEach((key, index) => {
+Object.keys(baseLayers).forEach(key => {
   const btn = document.createElement('div');
   btn.textContent = key;
-  btn.className = 'basemap-btn' + (index === 0 ? ' active' : '');
+  // ทำให้ปุ่มของแผนที่เริ่มต้น active
+  btn.className = 'basemap-btn' + (key === defaultLayerKey ? ' active' : '');
   btn.onclick = () => {
     Object.values(baseLayers).forEach(l => map.removeLayer(l));
     baseLayers[key].addTo(map);
@@ -174,7 +83,7 @@ fetch('layers.json')
             const opacitySlider = opacityDiv.querySelector('input');
             opacitySlider.addEventListener('input', () => {
               const value = opacitySlider.value / 100;
-              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ opacity: value, fillOpacity: value }); });
+              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ opacity: value, fillOpacity: value * 0.3 }); }); // ปรับ fillOpacity ให้สัมพันธ์กัน
             });
             itemDiv.appendChild(opacityDiv);
 
@@ -201,8 +110,6 @@ fetch('layers.json')
 
 // ฟังก์ชันสุ่มสีให้แต่ละชั้นไม่ซ้ำกัน
 function getRandomColor() {
-  return '#' + Math.floor(Math.random() * 16777215).toString(16);
+  return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
 }
 </script>
-</body>
-</html>
