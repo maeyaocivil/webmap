@@ -100,10 +100,10 @@ const map = L.map('map').setView([19.95, 99.80], 12);
 
 // 🗺️ Base Layers
 const baseLayers = {
-  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }), // ถนน
-  "Google Hybrid": L.tileLayer('https://mt1.google.com/vt/lyrs=h&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }), // ดาวเทียม + ถนน/ชื่อ
-  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }), // ดาวเทียมล้วน
-  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }) // OSM
+  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+  "Google Hybrid": L.tileLayer('https://mt1.google.com/vt/lyrs=h&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
 };
 
 // ⭐️ Set default map to Google Maps
@@ -157,46 +157,77 @@ fetch('layers.json')
         list.appendChild(itemDiv);
 
         let layer;
-        const initialFillOpacity = 0.3;
+        const initialFillOpacity = 0.4;
+        const initialRadius = 8;
+        const initialWeight = 2;
 
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
-            layer = omnivore.kml(layerInfo.file).on('ready', function() {
-              layer.eachLayer(l => {
-                if (l.setStyle)
-                  l.setStyle({
-                    color: layerInfo.color || getRandomColor(),
-                    weight: 2,
-                    opacity: 1, // Border opacity, always 100%
-                    fillOpacity: initialFillOpacity // Initial fill opacity
-                  });
-              });
-            }).addTo(map);
+            // --- 🎨 Color Logic ---
+            const isVillageBoundaryLayer = (layerInfo.name === 'แนวเขตหมู่บ้าน');
+            // Generate one color for the whole layer, unless it's the special village layer
+            const singleLayerColor = isVillageBoundaryLayer ? null : (layerInfo.color || getRandomColor());
 
+            const kmlOptions = {
+              // For Lines and Polygons
+              style: (feature) => {
+                const featureColor = isVillageBoundaryLayer ? getRandomColor() : singleLayerColor;
+                return {
+                  color: featureColor,
+                  weight: initialWeight,
+                  opacity: 1,
+                  fillOpacity: initialFillOpacity
+                };
+              },
+              // For Points
+              pointToLayer: (feature, latlng) => {
+                const featureColor = isVillageBoundaryLayer ? getRandomColor() : singleLayerColor;
+                return L.circleMarker(latlng, {
+                  radius: initialRadius,
+                  fillColor: featureColor,
+                  color: featureColor, // Border color of the circle
+                  weight: 1,
+                  opacity: 1,
+                  fillOpacity: initialFillOpacity
+                });
+              }
+            };
+            
+            layer = omnivore.kml(layerInfo.file, kmlOptions).addTo(map);
+
+            // --- 🎚️ Sliders ---
             // Opacity Slider
             const opacityDiv = document.createElement('div');
             opacityDiv.className = 'slider-container';
-            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="100">`;
+            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="${initialFillOpacity*100}">`;
             const opacitySlider = opacityDiv.querySelector('input');
             opacitySlider.addEventListener('input', () => {
-              const value = opacitySlider.value / 100; // Value from 0.0 to 1.0
-              //‼️ This now ONLY affects fillOpacity, not the border
-              layer.eachLayer(l => {
-                if (l.setStyle) l.setStyle({ fillOpacity: initialFillOpacity * value });
-              });
+              const value = opacitySlider.value / 100;
+              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ fillOpacity: value }); });
             });
             itemDiv.appendChild(opacityDiv);
 
             // Line Weight Slider
             const weightDiv = document.createElement('div');
             weightDiv.className = 'slider-container';
-            weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="2">`;
+            weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="${initialWeight}">`;
             const weightSlider = weightDiv.querySelector('input');
             weightSlider.addEventListener('input', () => {
               const value = parseFloat(weightSlider.value);
               layer.eachLayer(l => { if (l.setStyle) l.setStyle({ weight: value }); });
             });
             itemDiv.appendChild(weightDiv);
+            
+            // Point Radius Slider
+            const radiusDiv = document.createElement('div');
+            radiusDiv.className = 'slider-container';
+            radiusDiv.innerHTML = `ขนาดจุด: <input type="range" min="1" max="20" value="${initialRadius}">`;
+            const radiusSlider = radiusDiv.querySelector('input');
+            radiusSlider.addEventListener('input', () => {
+              const value = parseFloat(radiusSlider.value);
+              layer.eachLayer(l => { if (typeof l.setRadius === 'function') l.setRadius(value); });
+            });
+            itemDiv.appendChild(radiusDiv);
 
           } else {
             if (layer) map.removeLayer(layer);
