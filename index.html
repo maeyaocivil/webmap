@@ -1,88 +1,113 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title>WebMap Chiang Rai</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- Leaflet Locate Control -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
-  <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
-
-  <!-- Omnivore (อ่าน KML) -->
-  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
-
-  <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-
-    .layer-control {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.3);
-      padding: 10px;
-      z-index: 1000;
-      max-height: 90vh;
-      overflow-y: auto;
-      width: 260px;
-    }
-
-    .layer-group-title {
-      font-weight: bold;
-      background: #f4f4f4;
-      padding: 6px;
-      margin-top: 8px;
-      border-radius: 6px;
-    }
-
-    .layer-item {
-      margin: 5px 0;
-      padding: 5px;
-      border-bottom: 1px solid #ddd;
-    }
-
-    .slider {
-      width: 100%;
-    }
-
-    .map-toggle-btn {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 1001;
-      background: white;
-      border-radius: 6px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.3);
-      padding: 8px;
-    }
-  </style>
+<meta charset="utf-8" />
+<title>WebMap แม่ยาว</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  html, body, #map { height: 100%; margin: 0; }
+  .layer-control {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 9999;
+    background: rgba(255,255,255,0.95);
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow-y: auto;
+    width: 280px;
+  }
+  .slider { width: 100%; }
+  .group-title { font-weight: bold; margin-top: 10px; color: #006400; }
+</style>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.4/leaflet-omnivore.min.js"></script>
 </head>
 <body>
+<div id="map"></div>
+<div class="layer-control" id="layerControl">
+  <h3 style="margin:5px 0;">🗺️ แผนที่ฐาน</h3>
+  <label><input type="radio" name="basemap" value="osm" checked> OpenStreetMap</label><br>
+  <label><input type="radio" name="basemap" value="google"> Google Map</label><br>
+  <label><input type="radio" name="basemap" value="satellite"> Google Satellite</label><br>
+  <hr>
+  <h3 style="margin:5px 0;">📍 ชั้นข้อมูล</h3>
+  <div id="layers"></div>
+</div>
 
-  <div id="map"></div>
+<script>
+const map = L.map('map').setView([19.95, 99.85], 12);
 
-  <div class="map-toggle-btn" id="toggleBase">
-    🗺️ <select id="baseMapSelect">
-      <option value="satellite">Google ดาวเทียม</option>
-      <option value="roadmap">Google ถนน</option>
-      <option value="osm">OpenStreetMap</option>
-    </select>
-  </div>
+const baseLayers = {
+  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 20, attribution: '&copy; OpenStreetMap'
+  }),
+  google: L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
+  }),
+  satellite: L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
+  })
+};
+baseLayers.osm.addTo(map);
 
-  <div class="layer-control" id="layerControl">
-    <div class="layer-group-title">🗂️ สำนักปลัดเทศบาล</div>
-    <div id="group1"></div>
+document.querySelectorAll('input[name="basemap"]').forEach(r=>{
+  r.addEventListener('change', e=>{
+    map.eachLayer(l=>{ if(l instanceof L.TileLayer) map.removeLayer(l); });
+    baseLayers[e.target.value].addTo(map);
+  });
+});
 
-    <div class="layer-group-title">💰 กองคลัง</div>
-    <div id="group2"></div>
+// โหลดชั้นข้อมูลจาก JSON
+fetch("layers.json")
+  .then(res => res.json())
+  .then(layers => {
+    const container = document.getElementById("layers");
 
-    <div class="layer-group-title">📚 กองการศึกษา</div>
-    <div id="group3"></div>
+    layers.forEach((layerInfo, idx) => {
+      const div = document.createElement("div");
+      const color = layerInfo.color || getRandomColor();
+      div.innerHTML = `
+        <label>
+          <input type="checkbox" id="layer-${idx}"> ${layerInfo.name}
+        </label>
+        <br>ความทึบแสง:
+        <input type="range" min="0" max="100" value="100" class="slider" id="opacity-${idx}">
+        <br>ความหนาเส้น:
+        <input type="range" min="0" max="10" value="2" class="slider" id="weight-${idx}">
+        <hr>`;
+      container.appendChild(div);
 
-    <div clas
+      let layerGroup = L.layerGroup();
+
+      document.getElementById(`layer-${idx}`).addEventListener("change", e=>{
+        if(e.target.checked){
+          if(layerInfo.name === "แนวเขตหมู่บ้าน"){
+            omnivore.kml(layerInfo.file).on('ready', function(){
+              this.eachLayer(f=>{
+                const randomColor = getRandomColor();
+                f.setStyle({color: randomColor, fillColor: randomColor, fillOpacity: getOpacity(idx), weight: getWeight(idx)});
+              });
+            }).addTo(layerGroup);
+          } else {
+            omnivore.kml(layerInfo.file).on('ready', function(){
+              this.setStyle({
+                color: "#000000",
+                weight: getWeight(idx),
+                fillColor: color,
+                fillOpacity: getOpacity(idx)
+              });
+            }).addTo(layerGroup);
+          }
+          layerGroup.addTo(map);
+        } else {
+          map.removeLayer(layerGroup);
+        }
+      });
+
+      document.getElementById(`opacity-${idx}`).addEventListener("input", ()=>{
+        layerGroup.eachLayer(f=>{
+          const style
