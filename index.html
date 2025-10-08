@@ -12,19 +12,39 @@
 <style>
   html, body { height: 100%; margin: 0; }
   #map { height: 100%; width: 100%; }
-  .layer-control {
+
+  /* ปุ่มเปิดปิดแผงควบคุม */
+  #toggleBtn {
     position: absolute;
     top: 10px;
     right: 10px;
     background: white;
-    padding: 10px;
-    max-height: 90vh;
-    overflow-y: auto;
-    border-radius: 8px;
-    box-shadow: 0 0 8px rgba(0,0,0,0.3);
-    width: 280px;
+    border: 1px solid #999;
+    padding: 6px 12px;
+    border-radius: 6px;
+    z-index: 1001;
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
     font-family: "Sarabun", sans-serif;
   }
+
+  /* กล่องแผงข้อมูล */
+  .layer-control {
+    position: absolute;
+    top: 50px;
+    right: 10px;
+    background: white;
+    padding: 10px;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.4);
+    width: 300px;
+    font-family: "Sarabun", sans-serif;
+    z-index: 1000; /* สำคัญมาก ป้องกันโดนแผนที่ทับ */
+    display: none; /* เริ่มต้นซ่อน */
+  }
+
   .layer-group-title {
     font-weight: bold;
     background: #e0e0e0;
@@ -32,18 +52,22 @@
     margin: 5px 0;
     border-radius: 5px;
   }
+
   .layer-item {
     margin-left: 10px;
     margin-bottom: 8px;
   }
+
   .slider-container {
     margin: 2px 0 4px 20px;
     font-size: 0.85em;
     color: #333;
   }
+
   .slider-container input[type="range"] {
     width: 85%;
   }
+
   .basemap-btn {
     display: inline-block;
     background: #f2f2f2;
@@ -53,6 +77,7 @@
     border-radius: 5px;
     cursor: pointer;
   }
+
   .basemap-btn.active {
     background: #d1e7ff;
     border-color: #007bff;
@@ -61,6 +86,8 @@
 </head>
 <body>
 <div id="map"></div>
+<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
+
 <div class="layer-control" id="layerControl">
   <h3>🗺️ แผนที่ฐาน</h3>
   <div id="basemaps"></div>
@@ -93,7 +120,14 @@ Object.keys(baseLayers).forEach((key, index) => {
   basemapsDiv.appendChild(btn);
 });
 
-// โหลดข้อมูลชั้นจาก layers.json
+// ✅ ปุ่มเปิด/ปิดแผงควบคุม
+const toggleBtn = document.getElementById('toggleBtn');
+const layerControl = document.getElementById('layerControl');
+toggleBtn.onclick = () => {
+  layerControl.style.display = layerControl.style.display === 'none' ? 'block' : 'none';
+};
+
+// โหลดข้อมูลจาก layers.json
 fetch('layers.json')
   .then(res => res.json())
   .then(data => {
@@ -117,17 +151,23 @@ fetch('layers.json')
         itemDiv.appendChild(label);
         list.appendChild(itemDiv);
 
-        let layer; // ตัวแปรเก็บชั้นข้อมูล
+        let layer;
 
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
             layer = omnivore.kml(layerInfo.file).on('ready', function() {
               layer.eachLayer(l => {
-                if (l.setStyle) l.setStyle({ color: layerInfo.color || '#3388ff', weight: 2, opacity: 1 });
+                if (l.setStyle)
+                  l.setStyle({
+                    color: layerInfo.color || getRandomColor(),
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.3
+                  });
               });
             }).addTo(map);
 
-            // สร้าง Slider ความทึบ
+            // Slider ความทึบ
             const opacityDiv = document.createElement('div');
             opacityDiv.className = 'slider-container';
             opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="100">`;
@@ -138,7 +178,7 @@ fetch('layers.json')
             });
             itemDiv.appendChild(opacityDiv);
 
-            // สร้าง Slider ความหนาเส้น
+            // Slider ความหนาเส้น
             const weightDiv = document.createElement('div');
             weightDiv.className = 'slider-container';
             weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="2">`;
@@ -151,14 +191,18 @@ fetch('layers.json')
 
           } else {
             if (layer) map.removeLayer(layer);
-            const sliders = itemDiv.querySelectorAll('.slider-container');
-            sliders.forEach(el => el.remove());
+            itemDiv.querySelectorAll('.slider-container').forEach(el => el.remove());
           }
         });
       });
     });
   })
   .catch(err => console.error("Error loading layers.json:", err));
+
+// ฟังก์ชันสุ่มสีให้แต่ละชั้นไม่ซ้ำกัน
+function getRandomColor() {
+  return '#' + Math.floor(Math.random() * 16777215).toString(16);
+}
 </script>
 </body>
 </html>
