@@ -1,3 +1,100 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<title>WebMap - เทศบาลตำบลแม่ยาว</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+
+<style>
+  html, body { height: 100%; margin: 0; }
+  #map { height: 100%; width: 100%; }
+
+  /* ปุ่มเปิดปิดแผงควบคุม */
+  #toggleBtn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    border: 1px solid #999;
+    padding: 6px 12px;
+    border-radius: 6px;
+    z-index: 1001;
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    font-family: "Sarabun", sans-serif;
+  }
+
+  /* กล่องแผงข้อมูล */
+  .layer-control {
+    position: absolute;
+    top: 50px;
+    right: 10px;
+    background: white;
+    padding: 10px;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.4);
+    width: 300px;
+    font-family: "Sarabun", sans-serif;
+    z-index: 1000; /* สำคัญมาก ป้องกันโดนแผนที่ทับ */
+    display: none; /* เริ่มต้นซ่อน */
+  }
+
+  .layer-group-title {
+    font-weight: bold;
+    background: #e0e0e0;
+    padding: 6px;
+    margin: 5px 0;
+    border-radius: 5px;
+  }
+
+  .layer-item {
+    margin-left: 10px;
+    margin-bottom: 8px;
+  }
+
+  .slider-container {
+    margin: 2px 0 4px 20px;
+    font-size: 0.85em;
+    color: #333;
+  }
+
+  .slider-container input[type="range"] {
+    width: 85%;
+  }
+
+  .basemap-btn {
+    display: inline-block;
+    background: #f2f2f2;
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .basemap-btn.active {
+    background: #d1e7ff;
+    border-color: #007bff;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
+
+<div class="layer-control" id="layerControl">
+  <h3>🗺️ แผนที่ฐาน</h3>
+  <div id="basemaps"></div>
+  <h3>📚 ชั้นข้อมูล</h3>
+  <div id="layerList"></div>
+</div>
+
 <script>
 const map = L.map('map').setView([19.95, 99.80], 12);
 
@@ -8,7 +105,7 @@ const baseLayers = {
 };
 baseLayers["OpenStreetMap"].addTo(map);
 
-// ✅ ปุ่มเลือกแผนที่ฐาน
+// แสดงปุ่มเลือกแผนที่ฐาน
 const basemapsDiv = document.getElementById('basemaps');
 Object.keys(baseLayers).forEach((key, index) => {
   const btn = document.createElement('div');
@@ -55,61 +152,40 @@ fetch('layers.json')
         list.appendChild(itemDiv);
 
         let layer;
-        let baseColor = layerInfo.color || getRandomColor();
 
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
             layer = omnivore.kml(layerInfo.file).on('ready', function() {
-              // ✅ ถ้าเป็นแนวเขตหมู่บ้าน → แต่ละ polygon สีสุ่มไม่ซ้ำ
-              if (layerInfo.name.includes("แนวเขตหมู่บ้าน")) {
-                layer.eachLayer(l => {
-                  if (l.setStyle)
-                    l.setStyle({
-                      color: "#000000",           // เส้นขอบเข้มตลอด
-                      weight: 2,
-                      opacity: 1,                 // ขอบเส้นคงที่
-                      fillColor: getRandomColor(), // สีแต่ละ polygon ไม่ซ้ำ
-                      fillOpacity: 0.5
-                    });
-                });
-              } else {
-                // ✅ ชั้นทั่วไป ใช้สีเดียวทั้งชั้น
-                layer.eachLayer(l => {
-                  if (l.setStyle)
-                    l.setStyle({
-                      color: "#000000",    // เส้นขอบเข้มตลอด
-                      weight: 2,
-                      opacity: 1,          // ขอบเส้นคงที่
-                      fillColor: baseColor,
-                      fillOpacity: 0.5
-                    });
-                });
-              }
+              layer.eachLayer(l => {
+                if (l.setStyle)
+                  l.setStyle({
+                    color: layerInfo.color || getRandomColor(),
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.3
+                  });
+              });
             }).addTo(map);
 
-            // ✅ สไลด์ปรับความทึบของ Fill
+            // Slider ความทึบ
             const opacityDiv = document.createElement('div');
             opacityDiv.className = 'slider-container';
-            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="50">`;
+            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="100">`;
             const opacitySlider = opacityDiv.querySelector('input');
             opacitySlider.addEventListener('input', () => {
-              const fillValue = opacitySlider.value / 100;
-              layer.eachLayer(l => {
-                if (l.setStyle) l.setStyle({ fillOpacity: fillValue });
-              });
+              const value = opacitySlider.value / 100;
+              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ opacity: value, fillOpacity: value }); });
             });
             itemDiv.appendChild(opacityDiv);
 
-            // ✅ สไลด์ปรับความหนาเส้น
+            // Slider ความหนาเส้น
             const weightDiv = document.createElement('div');
             weightDiv.className = 'slider-container';
             weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="2">`;
             const weightSlider = weightDiv.querySelector('input');
             weightSlider.addEventListener('input', () => {
               const value = parseFloat(weightSlider.value);
-              layer.eachLayer(l => {
-                if (l.setStyle) l.setStyle({ weight: value });
-              });
+              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ weight: value }); });
             });
             itemDiv.appendChild(weightDiv);
 
@@ -123,8 +199,10 @@ fetch('layers.json')
   })
   .catch(err => console.error("Error loading layers.json:", err));
 
-// ฟังก์ชันสุ่มสี
+// ฟังก์ชันสุ่มสีให้แต่ละชั้นไม่ซ้ำกัน
 function getRandomColor() {
   return '#' + Math.floor(Math.random() * 16777215).toString(16);
 }
 </script>
+</body>
+</html>
