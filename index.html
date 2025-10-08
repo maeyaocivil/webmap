@@ -1,113 +1,130 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="utf-8" />
-<title>WebMap แม่ยาว</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<style>
-  html, body, #map { height: 100%; margin: 0; }
-  .layer-control {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 9999;
-    background: rgba(255,255,255,0.95);
-    padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    max-height: 90vh;
-    overflow-y: auto;
-    width: 280px;
-  }
-  .slider { width: 100%; }
-  .group-title { font-weight: bold; margin-top: 10px; color: #006400; }
-</style>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.4/leaflet-omnivore.min.js"></script>
-</head>
-<body>
-<div id="map"></div>
-<div class="layer-control" id="layerControl">
-  <h3 style="margin:5px 0;">🗺️ แผนที่ฐาน</h3>
-  <label><input type="radio" name="basemap" value="osm" checked> OpenStreetMap</label><br>
-  <label><input type="radio" name="basemap" value="google"> Google Map</label><br>
-  <label><input type="radio" name="basemap" value="satellite"> Google Satellite</label><br>
-  <hr>
-  <h3 style="margin:5px 0;">📍 ชั้นข้อมูล</h3>
-  <div id="layers"></div>
-</div>
-
 <script>
-const map = L.map('map').setView([19.95, 99.85], 12);
+const map = L.map('map').setView([19.95, 99.80], 12);
 
+// 🗺️ แผนที่ฐาน
 const baseLayers = {
-  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 20, attribution: '&copy; OpenStreetMap'
-  }),
-  google: L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-    maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
-  }),
-  satellite: L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-    maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
-  })
+  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 })
 };
-baseLayers.osm.addTo(map);
+baseLayers["OpenStreetMap"].addTo(map);
 
-document.querySelectorAll('input[name="basemap"]').forEach(r=>{
-  r.addEventListener('change', e=>{
-    map.eachLayer(l=>{ if(l instanceof L.TileLayer) map.removeLayer(l); });
-    baseLayers[e.target.value].addTo(map);
-  });
+// ✅ ปุ่มเลือกแผนที่ฐาน
+const basemapsDiv = document.getElementById('basemaps');
+Object.keys(baseLayers).forEach((key, index) => {
+  const btn = document.createElement('div');
+  btn.textContent = key;
+  btn.className = 'basemap-btn' + (index === 0 ? ' active' : '');
+  btn.onclick = () => {
+    Object.values(baseLayers).forEach(l => map.removeLayer(l));
+    baseLayers[key].addTo(map);
+    document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+  basemapsDiv.appendChild(btn);
 });
 
-// โหลดชั้นข้อมูลจาก JSON
-fetch("layers.json")
+// ✅ ปุ่มเปิด/ปิดแผงควบคุม
+const toggleBtn = document.getElementById('toggleBtn');
+const layerControl = document.getElementById('layerControl');
+toggleBtn.onclick = () => {
+  layerControl.style.display = layerControl.style.display === 'none' ? 'block' : 'none';
+};
+
+// โหลดข้อมูลจาก layers.json
+fetch('layers.json')
   .then(res => res.json())
-  .then(layers => {
-    const container = document.getElementById("layers");
+  .then(data => {
+    const list = document.getElementById('layerList');
+    data.groups.forEach(group => {
+      const title = document.createElement('div');
+      title.className = 'layer-group-title';
+      title.textContent = group.name;
+      list.appendChild(title);
 
-    layers.forEach((layerInfo, idx) => {
-      const div = document.createElement("div");
-      const color = layerInfo.color || getRandomColor();
-      div.innerHTML = `
-        <label>
-          <input type="checkbox" id="layer-${idx}"> ${layerInfo.name}
-        </label>
-        <br>ความทึบแสง:
-        <input type="range" min="0" max="100" value="100" class="slider" id="opacity-${idx}">
-        <br>ความหนาเส้น:
-        <input type="range" min="0" max="10" value="2" class="slider" id="weight-${idx}">
-        <hr>`;
-      container.appendChild(div);
+      group.layers.forEach(layerInfo => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'layer-item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = layerInfo.name;
+        const label = document.createElement('label');
+        label.htmlFor = layerInfo.name;
+        label.textContent = " " + layerInfo.name;
+        itemDiv.appendChild(checkbox);
+        itemDiv.appendChild(label);
+        list.appendChild(itemDiv);
 
-      let layerGroup = L.layerGroup();
+        let layer;
+        let baseColor = layerInfo.color || getRandomColor();
 
-      document.getElementById(`layer-${idx}`).addEventListener("change", e=>{
-        if(e.target.checked){
-          if(layerInfo.name === "แนวเขตหมู่บ้าน"){
-            omnivore.kml(layerInfo.file).on('ready', function(){
-              this.eachLayer(f=>{
-                const randomColor = getRandomColor();
-                f.setStyle({color: randomColor, fillColor: randomColor, fillOpacity: getOpacity(idx), weight: getWeight(idx)});
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            layer = omnivore.kml(layerInfo.file).on('ready', function() {
+              // ✅ ถ้าเป็นแนวเขตหมู่บ้าน → แต่ละ polygon สีสุ่มไม่ซ้ำ
+              if (layerInfo.name.includes("แนวเขตหมู่บ้าน")) {
+                layer.eachLayer(l => {
+                  if (l.setStyle)
+                    l.setStyle({
+                      color: "#000000",           // เส้นขอบเข้มตลอด
+                      weight: 2,
+                      opacity: 1,                 // ขอบเส้นคงที่
+                      fillColor: getRandomColor(), // สีแต่ละ polygon ไม่ซ้ำ
+                      fillOpacity: 0.5
+                    });
+                });
+              } else {
+                // ✅ ชั้นทั่วไป ใช้สีเดียวทั้งชั้น
+                layer.eachLayer(l => {
+                  if (l.setStyle)
+                    l.setStyle({
+                      color: "#000000",    // เส้นขอบเข้มตลอด
+                      weight: 2,
+                      opacity: 1,          // ขอบเส้นคงที่
+                      fillColor: baseColor,
+                      fillOpacity: 0.5
+                    });
+                });
+              }
+            }).addTo(map);
+
+            // ✅ สไลด์ปรับความทึบของ Fill
+            const opacityDiv = document.createElement('div');
+            opacityDiv.className = 'slider-container';
+            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="50">`;
+            const opacitySlider = opacityDiv.querySelector('input');
+            opacitySlider.addEventListener('input', () => {
+              const fillValue = opacitySlider.value / 100;
+              layer.eachLayer(l => {
+                if (l.setStyle) l.setStyle({ fillOpacity: fillValue });
               });
-            }).addTo(layerGroup);
+            });
+            itemDiv.appendChild(opacityDiv);
+
+            // ✅ สไลด์ปรับความหนาเส้น
+            const weightDiv = document.createElement('div');
+            weightDiv.className = 'slider-container';
+            weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="2">`;
+            const weightSlider = weightDiv.querySelector('input');
+            weightSlider.addEventListener('input', () => {
+              const value = parseFloat(weightSlider.value);
+              layer.eachLayer(l => {
+                if (l.setStyle) l.setStyle({ weight: value });
+              });
+            });
+            itemDiv.appendChild(weightDiv);
+
           } else {
-            omnivore.kml(layerInfo.file).on('ready', function(){
-              this.setStyle({
-                color: "#000000",
-                weight: getWeight(idx),
-                fillColor: color,
-                fillOpacity: getOpacity(idx)
-              });
-            }).addTo(layerGroup);
+            if (layer) map.removeLayer(layer);
+            itemDiv.querySelectorAll('.slider-container').forEach(el => el.remove());
           }
-          layerGroup.addTo(map);
-        } else {
-          map.removeLayer(layerGroup);
-        }
+        });
       });
+    });
+  })
+  .catch(err => console.error("Error loading layers.json:", err));
 
-      document.getElementById(`opacity-${idx}`).addEventListener("input", ()=>{
-        layerGroup.eachLayer(f=>{
-          const style
+// ฟังก์ชันสุ่มสี
+function getRandomColor() {
+  return '#' + Math.floor(Math.random() * 16777215).toString(16);
+}
+</script>
