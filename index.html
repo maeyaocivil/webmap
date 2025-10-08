@@ -2,77 +2,118 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>WebMap Chiang Rai</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
-
+  <title>WebMap</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
   <style>
     html, body, #map {
       height: 100%;
       margin: 0;
       padding: 0;
     }
+    #upload-box {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    }
+    #upload-box input {
+      display: block;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
+  <div id="upload-box">
+    <b>📂 อัปโหลดไฟล์ KML</b>
+    <input type="file" id="file-input" accept=".kml" />
+    <button id="clear-btn">🗑️ ลบชั้นข้อมูลทั้งหมด</button>
+  </div>
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
   <script>
-    const map = L.map('map').setView([19.9, 99.8], 11);
-
-    // แผนที่ฐาน
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      subdomains: ['mt0','mt1','mt2','mt3'],
-      attribution: '&copy; Google'
-    });
+    const map = L.map("map").setView([19.9, 99.8], 11);
 
     const baseMaps = {
-      "OSM": osm,
-      "Google ดาวเทียม": googleSat
+      "แผนที่ถนน": L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        { maxZoom: 19, attribution: "© OpenStreetMap" }
+      ).addTo(map),
+
+      "ภาพถ่ายดาวเทียม": L.tileLayer(
+        "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        { maxZoom: 20, attribution: "© Google" }
+      )
     };
 
     const overlayMaps = {};
 
-    // โหลดข้อมูลจาก layers.json
-    fetch('layers.json')
-      .then(res => {
-        if (!res.ok) throw new Error('โหลด layers.json ไม่ได้');
-        return res.json();
-      })
+    // โหลดข้อมูลชั้นจาก layers.json
+    fetch("layers.json")
+      .then(res => res.json())
       .then(layers => {
         layers.forEach(layer => {
           const kmlLayer = omnivore.kml(layer.url, null, L.geoJSON(null, {
-            style: { color: layer.color || "#ff0000" }
+            style: {
+              color: layer.color || "#ff0000",
+              weight: 2,
+              fillOpacity: 0   // 👈 ไม่มีสีพื้น
+            },
+            onEachFeature: function (feature, lyr) {
+              if (feature.properties) {
+                const popupContent = Object.keys(feature.properties)
+                  .map(k => `<b>${k}</b>: ${feature.properties[k]}`)
+                  .join("<br>");
+                lyr.bindPopup(popupContent);
+              }
+            }
           }));
           overlayMaps[layer.name] = kmlLayer;
         });
 
-        // เพิ่ม Layer control (ไม่เปิด overlay เริ่มต้น)
         L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
       })
-      .catch(err => {
-        console.error("เกิดข้อผิดพลาด:", err);
-        alert("โหลดข้อมูลไม่สำเร็จ กรุณาตรวจสอบชื่อไฟล์ layers.json");
-      });
+      .catch(err => console.error("โหลด layers.json ไม่ได้:", err));
 
-    // ปุ่มหาตำแหน่ง
-    L.control.locate({
-      position: 'topleft',
-      strings: { title: "หาตำแหน่งของฉัน" },
-      flyTo: true
-    }).addTo(map);
+    // โหลดไฟล์ใหม่จากเครื่อง
+    document.getElementById("file-input").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        // ล้างเลเยอร์เก่าออกก่อน
+        Object.values(overlayMaps).forEach(l => map.removeLayer(l));
+
+        // โหลดไฟล์ใหม่เข้าแผนที่
+        const newLayer = omnivore.kml.parse(event.target.result);
+        newLayer.setStyle({
+          color: "#0000ff",
+          weight: 2,
+          fillOpacity: 0   // 👈 ไม่มีสีพื้น
+        });
+        newLayer.addTo(map);
+        map.fitBounds(newLayer.getBounds());
+
+        overlayMaps["ไฟล์ที่อัปโหลด"] = newLayer;
+      };
+      reader.readAsText(file);
+    });
+
+    // ปุ่มลบชั้นข้อมูลทั้งหมด
+    document.getElementById("clear-btn").addEventListener("click", () => {
+      Object.values(overlayMaps).forEach(l => map.removeLayer(l));
+      alert("✅ ลบชั้นข้อมูลทั้งหมดแล้ว");
+    });
   </script>
 </body>
 </html>
