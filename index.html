@@ -1,208 +1,88 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8" />
-<title>WebMap - เทศบาลตำบลแม่ยาว</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>WebMap Chiang Rai</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<style>
-  html, body { height: 100%; margin: 0; }
-  #map { height: 100%; width: 100%; }
+  <!-- Leaflet Locate Control -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
+  <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
 
-  /* ปุ่มเปิดปิดแผงควบคุม */
-  #toggleBtn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: white;
-    border: 1px solid #999;
-    padding: 6px 12px;
-    border-radius: 6px;
-    z-index: 1001;
-    cursor: pointer;
-    box-shadow: 0 0 5px rgba(0,0,0,0.3);
-    font-family: "Sarabun", sans-serif;
-  }
+  <!-- Omnivore (อ่าน KML) -->
+  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
-  /* กล่องแผงข้อมูล */
-  .layer-control {
-    position: absolute;
-    top: 50px;
-    right: 10px;
-    background: white;
-    padding: 10px;
-    max-height: 85vh;
-    overflow-y: auto;
-    border-radius: 8px;
-    box-shadow: 0 0 8px rgba(0,0,0,0.4);
-    width: 300px;
-    font-family: "Sarabun", sans-serif;
-    z-index: 1000; /* สำคัญมาก ป้องกันโดนแผนที่ทับ */
-    display: none; /* เริ่มต้นซ่อน */
-  }
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
 
-  .layer-group-title {
-    font-weight: bold;
-    background: #e0e0e0;
-    padding: 6px;
-    margin: 5px 0;
-    border-radius: 5px;
-  }
+    .layer-control {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      padding: 10px;
+      z-index: 1000;
+      max-height: 90vh;
+      overflow-y: auto;
+      width: 260px;
+    }
 
-  .layer-item {
-    margin-left: 10px;
-    margin-bottom: 8px;
-  }
+    .layer-group-title {
+      font-weight: bold;
+      background: #f4f4f4;
+      padding: 6px;
+      margin-top: 8px;
+      border-radius: 6px;
+    }
 
-  .slider-container {
-    margin: 2px 0 4px 20px;
-    font-size: 0.85em;
-    color: #333;
-  }
+    .layer-item {
+      margin: 5px 0;
+      padding: 5px;
+      border-bottom: 1px solid #ddd;
+    }
 
-  .slider-container input[type="range"] {
-    width: 85%;
-  }
+    .slider {
+      width: 100%;
+    }
 
-  .basemap-btn {
-    display: inline-block;
-    background: #f2f2f2;
-    border: 1px solid #ccc;
-    padding: 4px 8px;
-    margin: 2px;
-    border-radius: 5px;
-    cursor: pointer;
-  }
-
-  .basemap-btn.active {
-    background: #d1e7ff;
-    border-color: #007bff;
-  }
-</style>
+    .map-toggle-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1001;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+      padding: 8px;
+    }
+  </style>
 </head>
 <body>
-<div id="map"></div>
-<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
 
-<div class="layer-control" id="layerControl">
-  <h3>🗺️ แผนที่ฐาน</h3>
-  <div id="basemaps"></div>
-  <h3>📚 ชั้นข้อมูล</h3>
-  <div id="layerList"></div>
-</div>
+  <div id="map"></div>
 
-<script>
-const map = L.map('map').setView([19.95, 99.80], 12);
+  <div class="map-toggle-btn" id="toggleBase">
+    🗺️ <select id="baseMapSelect">
+      <option value="satellite">Google ดาวเทียม</option>
+      <option value="roadmap">Google ถนน</option>
+      <option value="osm">OpenStreetMap</option>
+    </select>
+  </div>
 
-// 🗺️ แผนที่ฐาน
-const baseLayers = {
-  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 })
-};
-baseLayers["OpenStreetMap"].addTo(map);
+  <div class="layer-control" id="layerControl">
+    <div class="layer-group-title">🗂️ สำนักปลัดเทศบาล</div>
+    <div id="group1"></div>
 
-// แสดงปุ่มเลือกแผนที่ฐาน
-const basemapsDiv = document.getElementById('basemaps');
-Object.keys(baseLayers).forEach((key, index) => {
-  const btn = document.createElement('div');
-  btn.textContent = key;
-  btn.className = 'basemap-btn' + (index === 0 ? ' active' : '');
-  btn.onclick = () => {
-    Object.values(baseLayers).forEach(l => map.removeLayer(l));
-    baseLayers[key].addTo(map);
-    document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  };
-  basemapsDiv.appendChild(btn);
-});
+    <div class="layer-group-title">💰 กองคลัง</div>
+    <div id="group2"></div>
 
-// ✅ ปุ่มเปิด/ปิดแผงควบคุม
-const toggleBtn = document.getElementById('toggleBtn');
-const layerControl = document.getElementById('layerControl');
-toggleBtn.onclick = () => {
-  layerControl.style.display = layerControl.style.display === 'none' ? 'block' : 'none';
-};
+    <div class="layer-group-title">📚 กองการศึกษา</div>
+    <div id="group3"></div>
 
-// โหลดข้อมูลจาก layers.json
-fetch('layers.json')
-  .then(res => res.json())
-  .then(data => {
-    const list = document.getElementById('layerList');
-    data.groups.forEach(group => {
-      const title = document.createElement('div');
-      title.className = 'layer-group-title';
-      title.textContent = group.name;
-      list.appendChild(title);
-
-      group.layers.forEach(layerInfo => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'layer-item';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = layerInfo.name;
-        const label = document.createElement('label');
-        label.htmlFor = layerInfo.name;
-        label.textContent = " " + layerInfo.name;
-        itemDiv.appendChild(checkbox);
-        itemDiv.appendChild(label);
-        list.appendChild(itemDiv);
-
-        let layer;
-
-        checkbox.addEventListener('change', () => {
-          if (checkbox.checked) {
-            layer = omnivore.kml(layerInfo.file).on('ready', function() {
-              layer.eachLayer(l => {
-                if (l.setStyle)
-                  l.setStyle({
-                    color: layerInfo.color || getRandomColor(),
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.3
-                  });
-              });
-            }).addTo(map);
-
-            // Slider ความทึบ
-            const opacityDiv = document.createElement('div');
-            opacityDiv.className = 'slider-container';
-            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="100">`;
-            const opacitySlider = opacityDiv.querySelector('input');
-            opacitySlider.addEventListener('input', () => {
-              const value = opacitySlider.value / 100;
-              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ opacity: value, fillOpacity: value }); });
-            });
-            itemDiv.appendChild(opacityDiv);
-
-            // Slider ความหนาเส้น
-            const weightDiv = document.createElement('div');
-            weightDiv.className = 'slider-container';
-            weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="2">`;
-            const weightSlider = weightDiv.querySelector('input');
-            weightSlider.addEventListener('input', () => {
-              const value = parseFloat(weightSlider.value);
-              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ weight: value }); });
-            });
-            itemDiv.appendChild(weightDiv);
-
-          } else {
-            if (layer) map.removeLayer(layer);
-            itemDiv.querySelectorAll('.slider-container').forEach(el => el.remove());
-          }
-        });
-      });
-    });
-  })
-  .catch(err => console.error("Error loading layers.json:", err));
-
-// ฟังก์ชันสุ่มสีให้แต่ละชั้นไม่ซ้ำกัน
-function getRandomColor() {
-  return '#' + Math.floor(Math.random() * 16777215).toString(16);
-}
-</script>
-</body>
-</html>
+    <div clas
