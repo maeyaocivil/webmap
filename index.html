@@ -5,30 +5,47 @@
   <title>WebMap Chiang Rai</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css"/>
+
   <style>
     html, body, #map { height: 100%; margin: 0; }
-    .layer-slider {
-      margin: 4px 0 8px 10px;
-      width: 160px;
-    }
     .leaflet-control-layers {
       font-family: "TH Sarabun New", sans-serif;
       font-size: 16px;
+    }
+    .layer-slider {
+      margin: 4px 0 4px 20px;
+      width: 150px;
+    }
+    .layer-label {
+      margin-left: 10px;
+      font-weight: bold;
+      display: block;
+    }
+    .leaflet-control-layers-toggle {
+      background-image: url('https://cdn-icons-png.flaticon.com/512/854/854878.png');
+      background-size: 22px 22px;
+      background-color: white;
+      border-radius: 4px;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
+  <!-- Scripts -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
-  <script src="https://unpkg.com/omnivore/leaflet-omnivore.min.js"></script>
+  <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.4/leaflet-omnivore.min.js"></script>
 
   <script>
+    // === สร้างแผนที่ ===
     const map = L.map('map').setView([19.9, 99.8], 11);
 
+    // === แผนที่ฐาน ===
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
@@ -39,64 +56,94 @@
     });
 
     const baseMaps = {
-      "OSM": osm,
-      "Google ดาวเทียม": googleSat
+      "🗺️ แผนที่ OSM": osm,
+      "🛰️ Google ดาวเทียม": googleSat
     };
 
     const overlayMaps = {};
-    const activeLayers = {}; // เก็บชั้นข้อมูลที่เปิดอยู่
 
-    // โหลดจาก layers.json
+    // === โหลดชั้นข้อมูลจาก layers.json ===
     fetch('layers.json')
       .then(res => res.json())
       .then(layers => {
         layers.forEach(layer => {
           const kmlLayer = omnivore.kml(layer.file, null, L.geoJSON(null, {
-            style: { color: layer.color, weight: layer.weight || 2, fillOpacity: 0 },
+            style: { color: layer.color, weight: layer.weight || 2, opacity: 1, fillOpacity: 0 }
           }));
 
           overlayMaps[layer.name] = kmlLayer;
 
-          // เมื่อเพิ่มหรือลบเลเยอร์
-          kmlLayer.on('add', () => addOpacitySlider(layer.name, kmlLayer));
-          kmlLayer.on('remove', () => removeOpacitySlider(layer.name));
+          // เมื่อชั้นข้อมูลถูกเปิด
+          kmlLayer.on('add', () => addSliders(layer.name, kmlLayer));
+          kmlLayer.on('remove', () => removeSliders(layer.name));
         });
 
-        const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
-      });
+        // === แผงควบคุมชั้นข้อมูล ===
+        const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: true }).addTo(map);
+      })
+      .catch(err => console.error("Error loading layers.json:", err));
 
-    // ฟังก์ชันเพิ่ม slider
-    function addOpacitySlider(layerName, layer) {
-      if (document.getElementById('slider-' + layerName)) return;
+    // === สร้าง Slider ===
+    function addSliders(name, layer) {
+      if (document.getElementById('opacity-' + name)) return;
 
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = 0;
-      slider.max = 100;
-      slider.value = 100;
-      slider.className = 'layer-slider';
-      slider.id = 'slider-' + layerName;
+      const labels = Array.from(document.querySelectorAll('.leaflet-control-layers-overlays label'));
+      const label = labels.find(l => l.textContent.trim() === name);
+      if (!label) return;
 
-      const label = Array.from(document.querySelectorAll('.leaflet-control-layers-overlays label'))
-        .find(l => l.textContent.trim() === layerName);
+      // ความทึบ
+      const opLabel = document.createElement('div');
+      opLabel.className = 'layer-label';
+      opLabel.textContent = 'ความทึบ:';
+      const opSlider = document.createElement('input');
+      opSlider.type = 'range';
+      opSlider.min = 0;
+      opSlider.max = 100;
+      opSlider.value = 100;
+      opSlider.className = 'layer-slider';
+      opSlider.id = 'opacity-' + name;
 
-      if (label) label.appendChild(slider);
+      // ความหนา
+      const wtLabel = document.createElement('div');
+      wtLabel.className = 'layer-label';
+      wtLabel.textContent = 'ความหนาเส้น:';
+      const wtSlider = document.createElement('input');
+      wtSlider.type = 'range';
+      wtSlider.min = 0;
+      wtSlider.max = 10;
+      wtSlider.value = 2;
+      wtSlider.className = 'layer-slider';
+      wtSlider.id = 'weight-' + name;
 
-      slider.addEventListener('input', e => {
+      label.appendChild(opLabel);
+      label.appendChild(opSlider);
+      label.appendChild(wtLabel);
+      label.appendChild(wtSlider);
+
+      opSlider.addEventListener('input', e => {
         const opacity = e.target.value / 100;
-        layer.eachLayer(l => {
-          if (l.setStyle) l.setStyle({ opacity: opacity });
-        });
+        layer.eachLayer(l => l.setStyle && l.setStyle({ opacity }));
+      });
+
+      wtSlider.addEventListener('input', e => {
+        const weight = parseFloat(e.target.value);
+        layer.eachLayer(l => l.setStyle && l.setStyle({ weight }));
       });
     }
 
-    // ฟังก์ชันลบ slider
-    function removeOpacitySlider(layerName) {
-      const el = document.getElementById('slider-' + layerName);
-      if (el) el.remove();
+    // === ลบ Slider เมื่อปิดชั้นข้อมูล ===
+    function removeSliders(name) {
+      ['opacity-', 'weight-'].forEach(prefix => {
+        const el = document.getElementById(prefix + name);
+        if (el) el.remove();
+      });
+      const labels = document.querySelectorAll('.layer-label');
+      labels.forEach(l => {
+        if (l.textContent.includes('ความทึบ') || l.textContent.includes('ความหนาเส้น')) l.remove();
+      });
     }
 
-    // ปุ่มหาตำแหน่งผู้ใช้
+    // === ปุ่มหาตำแหน่งผู้ใช้ ===
     L.control.locate({
       position: 'topleft',
       strings: { title: "หาตำแหน่งของฉัน" },
