@@ -6,26 +6,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
 
   <style>
-    #map { height: 100vh; width: 100%; }
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
   <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
-  <script src="https://unpkg.com/omnivore/leaflet-omnivore.min.js"></script>
+  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
   <script>
-    // สร้างแผนที่เริ่มต้น
+    // สร้างแผนที่
     const map = L.map('map').setView([19.9, 99.8], 11);
 
-    // ฐานแผนที่
+    // แผนที่ฐาน
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
@@ -36,21 +40,34 @@
     });
 
     const baseMaps = {
-      "แผนที่ถนน (OSM)": osm,
-      "แผนที่ดาวเทียม (Google)": googleSat
+      "OSM": osm,
+      "Google ดาวเทียม": googleSat
     };
 
     const overlayMaps = {};
 
-    // โหลดชั้นข้อมูลจาก layers.json
+    // โหลดข้อมูลจาก layers.json
     fetch('layers.json')
       .then(res => res.json())
       .then(layers => {
         layers.forEach(layer => {
-          // โหลดแต่ละไฟล์ KML พร้อมสี
-          const kmlLayer = omnivore.kml(layer.url, null, L.geoJSON(null, {
-            style: { color: layer.color }
+          const kmlLayer = omnivore.kml(layer.file, null, L.geoJSON(null, {
+            style: { color: layer.color || "#ff0000" }
           }));
-
           overlayMaps[layer.name] = kmlLayer;
         });
+
+        // เพิ่ม control (แต่ยังไม่เปิด overlay)
+        L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
+      })
+      .catch(err => console.error("โหลด layers.json ไม่ได้:", err));
+
+    // ปุ่มหาตำแหน่งผู้ใช้
+    L.control.locate({
+      position: 'topleft',
+      strings: { title: "หาตำแหน่งของฉัน" },
+      flyTo: true
+    }).addTo(map);
+  </script>
+</body>
+</html>
