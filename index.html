@@ -1,154 +1,164 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <title>WebMap Chiang Rai</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<title>WebMap - เทศบาลตำบลแม่ยาว</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
-  <style>
-    html, body, #map { height: 100%; margin: 0; }
-    .leaflet-control-layers {
-      font-family: "TH Sarabun New", sans-serif;
-      font-size: 16px;
-    }
-    .layer-slider {
-      margin: 4px 0 4px 20px;
-      width: 150px;
-    }
-    .layer-label {
-      margin-left: 10px;
-      font-weight: bold;
-      display: block;
-    }
-    .leaflet-control-layers-toggle {
-      background-image: url('https://cdn-icons-png.flaticon.com/512/854/854878.png');
-      background-size: 22px 22px;
-      background-color: white;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-    }
-  </style>
+<style>
+  html, body { height: 100%; margin: 0; }
+  #map { height: 100%; width: 100%; }
+  .layer-control {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    padding: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.3);
+    width: 280px;
+    font-family: "Sarabun", sans-serif;
+  }
+  .layer-group-title {
+    font-weight: bold;
+    background: #e0e0e0;
+    padding: 6px;
+    margin: 5px 0;
+    border-radius: 5px;
+  }
+  .layer-item {
+    margin-left: 10px;
+    margin-bottom: 8px;
+  }
+  .slider-container {
+    margin: 2px 0 4px 20px;
+    font-size: 0.85em;
+    color: #333;
+  }
+  .slider-container input[type="range"] {
+    width: 85%;
+  }
+  .basemap-btn {
+    display: inline-block;
+    background: #f2f2f2;
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .basemap-btn.active {
+    background: #d1e7ff;
+    border-color: #007bff;
+  }
+</style>
 </head>
 <body>
-  <div id="map"></div>
+<div id="map"></div>
+<div class="layer-control" id="layerControl">
+  <h3>🗺️ แผนที่ฐาน</h3>
+  <div id="basemaps"></div>
+  <h3>📚 ชั้นข้อมูล</h3>
+  <div id="layerList"></div>
+</div>
 
-  <!-- Scripts -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
-  <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.4/leaflet-omnivore.min.js"></script>
+<script>
+const map = L.map('map').setView([19.95, 99.80], 12);
 
-  <script>
-    // === สร้างแผนที่ ===
-    const map = L.map('map').setView([19.9, 99.8], 11);
+// 🗺️ แผนที่ฐาน
+const baseLayers = {
+  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 })
+};
+baseLayers["OpenStreetMap"].addTo(map);
 
-    // === แผนที่ฐาน ===
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+// แสดงปุ่มเลือกแผนที่ฐาน
+const basemapsDiv = document.getElementById('basemaps');
+Object.keys(baseLayers).forEach((key, index) => {
+  const btn = document.createElement('div');
+  btn.textContent = key;
+  btn.className = 'basemap-btn' + (index === 0 ? ' active' : '');
+  btn.onclick = () => {
+    Object.values(baseLayers).forEach(l => map.removeLayer(l));
+    baseLayers[key].addTo(map);
+    document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+  basemapsDiv.appendChild(btn);
+});
 
-    const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      subdomains: ['mt0','mt1','mt2','mt3'],
-      attribution: '&copy; Google'
-    });
+// โหลดข้อมูลชั้นจาก layers.json
+fetch('layers.json')
+  .then(res => res.json())
+  .then(data => {
+    const list = document.getElementById('layerList');
+    data.groups.forEach(group => {
+      const title = document.createElement('div');
+      title.className = 'layer-group-title';
+      title.textContent = group.name;
+      list.appendChild(title);
 
-    const baseMaps = {
-      "🗺️ แผนที่ OSM": osm,
-      "🛰️ Google ดาวเทียม": googleSat
-    };
+      group.layers.forEach(layerInfo => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'layer-item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = layerInfo.name;
+        const label = document.createElement('label');
+        label.htmlFor = layerInfo.name;
+        label.textContent = " " + layerInfo.name;
+        itemDiv.appendChild(checkbox);
+        itemDiv.appendChild(label);
+        list.appendChild(itemDiv);
 
-    const overlayMaps = {};
+        let layer; // ตัวแปรเก็บชั้นข้อมูล
 
-    // === โหลดชั้นข้อมูลจาก layers.json ===
-    fetch('layers.json')
-      .then(res => res.json())
-      .then(layers => {
-        layers.forEach(layer => {
-          const kmlLayer = omnivore.kml(layer.file, null, L.geoJSON(null, {
-            style: { color: layer.color, weight: layer.weight || 2, opacity: 1, fillOpacity: 0 }
-          }));
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            layer = omnivore.kml(layerInfo.file).on('ready', function() {
+              layer.eachLayer(l => {
+                if (l.setStyle) l.setStyle({ color: layerInfo.color || '#3388ff', weight: 2, opacity: 1 });
+              });
+            }).addTo(map);
 
-          overlayMaps[layer.name] = kmlLayer;
+            // สร้าง Slider ความทึบ
+            const opacityDiv = document.createElement('div');
+            opacityDiv.className = 'slider-container';
+            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="100">`;
+            const opacitySlider = opacityDiv.querySelector('input');
+            opacitySlider.addEventListener('input', () => {
+              const value = opacitySlider.value / 100;
+              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ opacity: value, fillOpacity: value }); });
+            });
+            itemDiv.appendChild(opacityDiv);
 
-          // เมื่อชั้นข้อมูลถูกเปิด
-          kmlLayer.on('add', () => addSliders(layer.name, kmlLayer));
-          kmlLayer.on('remove', () => removeSliders(layer.name));
+            // สร้าง Slider ความหนาเส้น
+            const weightDiv = document.createElement('div');
+            weightDiv.className = 'slider-container';
+            weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="2">`;
+            const weightSlider = weightDiv.querySelector('input');
+            weightSlider.addEventListener('input', () => {
+              const value = parseFloat(weightSlider.value);
+              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ weight: value }); });
+            });
+            itemDiv.appendChild(weightDiv);
+
+          } else {
+            if (layer) map.removeLayer(layer);
+            const sliders = itemDiv.querySelectorAll('.slider-container');
+            sliders.forEach(el => el.remove());
+          }
         });
-
-        // === แผงควบคุมชั้นข้อมูล ===
-        const layerControl = L.control.layers(baseMaps, overlayMaps, { collapsed: true }).addTo(map);
-      })
-      .catch(err => console.error("Error loading layers.json:", err));
-
-    // === สร้าง Slider ===
-    function addSliders(name, layer) {
-      if (document.getElementById('opacity-' + name)) return;
-
-      const labels = Array.from(document.querySelectorAll('.leaflet-control-layers-overlays label'));
-      const label = labels.find(l => l.textContent.trim() === name);
-      if (!label) return;
-
-      // ความทึบ
-      const opLabel = document.createElement('div');
-      opLabel.className = 'layer-label';
-      opLabel.textContent = 'ความทึบ:';
-      const opSlider = document.createElement('input');
-      opSlider.type = 'range';
-      opSlider.min = 0;
-      opSlider.max = 100;
-      opSlider.value = 100;
-      opSlider.className = 'layer-slider';
-      opSlider.id = 'opacity-' + name;
-
-      // ความหนา
-      const wtLabel = document.createElement('div');
-      wtLabel.className = 'layer-label';
-      wtLabel.textContent = 'ความหนาเส้น:';
-      const wtSlider = document.createElement('input');
-      wtSlider.type = 'range';
-      wtSlider.min = 0;
-      wtSlider.max = 10;
-      wtSlider.value = 2;
-      wtSlider.className = 'layer-slider';
-      wtSlider.id = 'weight-' + name;
-
-      label.appendChild(opLabel);
-      label.appendChild(opSlider);
-      label.appendChild(wtLabel);
-      label.appendChild(wtSlider);
-
-      opSlider.addEventListener('input', e => {
-        const opacity = e.target.value / 100;
-        layer.eachLayer(l => l.setStyle && l.setStyle({ opacity }));
       });
-
-      wtSlider.addEventListener('input', e => {
-        const weight = parseFloat(e.target.value);
-        layer.eachLayer(l => l.setStyle && l.setStyle({ weight }));
-      });
-    }
-
-    // === ลบ Slider เมื่อปิดชั้นข้อมูล ===
-    function removeSliders(name) {
-      ['opacity-', 'weight-'].forEach(prefix => {
-        const el = document.getElementById(prefix + name);
-        if (el) el.remove();
-      });
-      const labels = document.querySelectorAll('.layer-label');
-      labels.forEach(l => {
-        if (l.textContent.includes('ความทึบ') || l.textContent.includes('ความหนาเส้น')) l.remove();
-      });
-    }
-
-    // === ปุ่มหาตำแหน่งผู้ใช้ ===
-    L.control.locate({
-      position: 'topleft',
-      strings: { title: "หาตำแหน่งของฉัน" },
-      flyTo: true
-    }).addTo(map);
-  </script>
+    });
+  })
+  .catch(err => console.error("Error loading layers.json:", err));
+</script>
 </body>
 </html>
