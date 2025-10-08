@@ -26,7 +26,6 @@
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
   <script>
-    // สร้างแผนที่
     const map = L.map('map').setView([19.9, 99.8], 11);
 
     // แผนที่ฐาน
@@ -48,21 +47,27 @@
 
     // โหลดข้อมูลจาก layers.json
     fetch('layers.json')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('โหลด layers.json ไม่ได้');
+        return res.json();
+      })
       .then(layers => {
         layers.forEach(layer => {
-          const kmlLayer = omnivore.kml(layer.file, null, L.geoJSON(null, {
+          const kmlLayer = omnivore.kml(layer.url, null, L.geoJSON(null, {
             style: { color: layer.color || "#ff0000" }
           }));
           overlayMaps[layer.name] = kmlLayer;
         });
 
-        // เพิ่ม control (แต่ยังไม่เปิด overlay)
+        // เพิ่ม Layer control (ไม่เปิด overlay เริ่มต้น)
         L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map);
       })
-      .catch(err => console.error("โหลด layers.json ไม่ได้:", err));
+      .catch(err => {
+        console.error("เกิดข้อผิดพลาด:", err);
+        alert("โหลดข้อมูลไม่สำเร็จ กรุณาตรวจสอบชื่อไฟล์ layers.json");
+      });
 
-    // ปุ่มหาตำแหน่งผู้ใช้
+    // ปุ่มหาตำแหน่ง
     L.control.locate({
       position: 'topleft',
       strings: { title: "หาตำแหน่งของฉัน" },
