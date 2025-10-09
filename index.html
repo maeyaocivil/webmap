@@ -1,214 +1,73 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8" />
-<title>OneMap - เทศบาลตำบลแม่ยาว</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <title>OneMap - เทศบาลตำบลแม่ยาว</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<style>
-html, body { height: 100%; margin: 0; }
-#map { height: 100%; width: 100%; }
-#toggleBtn {
-  position: absolute; top: 10px; right: 10px;
-  background: white; border: 1px solid #999;
-  padding: 6px 12px; border-radius: 6px;
-  z-index: 1001; cursor: pointer;
-  box-shadow: 0 0 5px rgba(0,0,0,0.3);
-  font-family: "Sarabun", sans-serif;
-}
-.layer-control {
-  position: absolute; top: 50px; right: 10px;
-  background: white; padding: 10px; max-height: 85vh;
-  overflow-y: auto; border-radius: 8px;
-  box-shadow: 0 0 8px rgba(0,0,0,0.4);
-  width: 320px; font-family: "Sarabun", sans-serif;
-  z-index: 1000; display: none;
-}
-.layer-group-title {
-  font-weight: bold; background: #e0e0e0;
-  padding: 6px; margin: 5px 0; border-radius: 5px;
-}
-.layer-item { margin-left: 10px; margin-bottom: 8px; }
-.slider-container { margin: 2px 0 4px 20px; font-size: 0.85em; color: #333; }
-.slider-container input[type="range"] { width: 85%; }
-.basemap-btn {
-  display: inline-block; background: #f2f2f2;
-  border: 1px solid #ccc; padding: 4px 8px; margin: 2px;
-  border-radius: 5px; cursor: pointer;
-}
-.basemap-btn.active { background: #d1e7ff; border-color: #007bff; }
-</style>
+  <!-- omnivore สำหรับอ่าน KML -->
+  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { width: 100%; height: 100%; }
+
+    .leaflet-control-layers {
+      font-size: 14px;
+      background-color: rgba(255, 255, 255, 0.9);
+    }
+  </style>
 </head>
 <body>
-<div id="map"></div>
-<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
+  <div id="map"></div>
 
-<div class="layer-control" id="layerControl">
-  <h3>🗺️ แผนที่ฐาน</h3>
-  <div id="basemaps"></div>
-  <h3>📚 ชั้นข้อมูล</h3>
-  <div id="layerList"></div>
-</div>
+  <script>
+    // เริ่มต้นแผนที่
+    const map = L.map('map').setView([19.95, 99.8], 12);
 
-<script>
-// 🗺️ ตั้งค่าแผนที่หลัก
-const map = L.map('map').setView([19.95, 99.80], 12);
+    // พื้นหลัง
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
 
-// 🧩 Base Layers
-const baseLayers = {
-  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 })
-};
+    // ฟังก์ชันสุ่มสี
+    function randomColor() {
+      const hue = Math.floor(Math.random() * 360);
+      return `hsl(${hue}, 70%, 50%)`;
+    }
 
-const defaultLayerKey = "OpenStreetMap";
-baseLayers[defaultLayerKey].addTo(map);
+    // โหลดไฟล์ KML ทั้งหมดจากโฟลเดอร์ layers/
+    fetch('https://api.github.com/repos/maeyaocivil/maeyaocivil.github.io/contents/layers')
+      .then(res => res.json())
+      .then(files => {
+        const overlays = {};
 
-// 🗺️ สร้างปุ่มแผนที่ฐาน
-const basemapsDiv = document.getElementById('basemaps');
-Object.keys(baseLayers).forEach(key => {
-  const btn = document.createElement('div');
-  btn.textContent = key;
-  btn.className = 'basemap-btn' + (key === defaultLayerKey ? ' active' : '');
-  btn.onclick = () => {
-    Object.values(baseLayers).forEach(l => map.removeLayer(l));
-    baseLayers[key].addTo(map);
-    document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  };
-  basemapsDiv.appendChild(btn);
-});
-
-// 🎛️ Toggle ปุ่มควบคุม
-const toggleBtn = document.getElementById('toggleBtn');
-const layerControl = document.getElementById('layerControl');
-toggleBtn.onclick = () => {
-  layerControl.style.display = layerControl.style.display === 'none' ? 'block' : 'none';
-};
-
-// 🎨 สุ่มสี
-function getRandomColor() {
-  return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-}
-
-// 📦 โหลดข้อมูลชั้นจาก JSON
-fetch('layers.json')
-  .then(res => res.json())
-  .then(data => {
-    const list = document.getElementById('layerList');
-
-    data.groups.forEach(group => {
-      const title = document.createElement('div');
-      title.className = 'layer-group-title';
-      title.textContent = group.name;
-      list.appendChild(title);
-
-      group.layers.forEach(layerInfo => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'layer-item';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = layerInfo.name;
-
-        const label = document.createElement('label');
-        label.htmlFor = layerInfo.name;
-        label.textContent = " " + layerInfo.name;
-
-        itemDiv.appendChild(checkbox);
-        itemDiv.appendChild(label);
-        list.appendChild(itemDiv);
-
-        let layer;
-        const color = layerInfo.name.includes("แนวเขตหมู่บ้าน") ? null : getRandomColor();
-
-        // ✅ toggle แสดง/ซ่อนข้อมูล
-        checkbox.addEventListener('change', () => {
-          if (checkbox.checked) {
-            layer = omnivore.kml(layerInfo.file)
-              .on('ready', function() {
-                const geojson = this.toGeoJSON();
-                const types = geojson.features.map(f => f.geometry.type);
-                const hasPoint = types.includes('Point');
-                const isVillage = layerInfo.name.includes("แนวเขตหมู่บ้าน");
-
-                let baseColor = color || getRandomColor();
-
-                // 🔹 สไตล์
-                layer.eachLayer(l => {
-                  const f = l.feature;
-                  const t = f.geometry.type;
-                  if (hasPoint && t === 'Point') {
-                    const marker = L.circleMarker(l.getLatLng(), {
-                      radius: 8,
-                      color: baseColor,
-                      fillColor: baseColor,
-                      fillOpacity: 0.8,
-                      weight: 1
-                    });
-                    marker.bindPopup(f.properties.name || layerInfo.name);
-                    marker.addTo(map);
-                    l.remove();
-                    l = marker;
-                  } else if (t === 'Polygon' || t === 'MultiPolygon') {
-                    if (isVillage) baseColor = getRandomColor();
-                    l.setStyle({
-                      color: baseColor,
-                      weight: 2,
-                      fillColor: baseColor,
-                      fillOpacity: 0.5
-                    });
-                  } else {
-                    l.setStyle({
-                      color: baseColor,
-                      weight: 2
-                    });
-                  }
-                  if (f.properties && f.properties.name)
-                    l.bindPopup(f.properties.name);
-                });
+        files.forEach(file => {
+          if (file.name.endsWith('.kml')) {
+            const color = randomColor();
+            const layer = omnivore.kml(`layers/${file.name}`, null, L.geoJson(null, {
+              style: () => ({
+                color: color,
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.2
               })
-              .addTo(map);
-
-            // 🎚️ ความทึบ
-            const opacityDiv = document.createElement('div');
-            opacityDiv.className = 'slider-container';
-            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="50">`;
-            const opacitySlider = opacityDiv.querySelector('input');
-            opacitySlider.addEventListener('input', () => {
-              layer.eachLayer(l => {
-                if (l.setStyle) {
-                  const style = l.options;
-                  l.setStyle({
-                    ...style,
-                    fillOpacity: opacitySlider.value / 100
-                  });
-                }
-              });
+            })).on('ready', function() {
+              map.fitBounds(layer.getBounds());
             });
-            list.insertBefore(opacityDiv, itemDiv.nextSibling);
 
-            // 🎚️ ความหนาเส้น
-            const weightDiv = document.createElement('div');
-            weightDiv.className = 'slider-container';
-            weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="2">`;
-            const weightSlider = weightDiv.querySelector('input');
-            weightSlider.addEventListener('input', () => {
-              layer.eachLayer(l => {
-                if (l.setStyle) l.setStyle({ weight: parseFloat(weightSlider.value) });
-              });
-            });
-            list.insertBefore(weightDiv, opacityDiv.nextSibling);
-          } else {
-            if (layer) map.removeLayer(layer);
+            overlays[file.name.replace('.kml', '')] = layer;
           }
         });
-      });
-    });
-  });
-</script>
+
+        L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+      })
+      .catch(err => console.error('โหลดรายชื่อไฟล์ KML ไม่ได้:', err));
+  </script>
 </body>
 </html>
