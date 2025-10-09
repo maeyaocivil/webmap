@@ -1,73 +1,193 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <title>OneMap - เทศบาลตำบลแม่ยาว</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<title>OneMap - เทศบาลตำบลแม่ยาว</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
-  <!-- omnivore สำหรับอ่าน KML -->
-  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
-
-  <style>
-    html, body { height: 100%; margin: 0; }
-    #map { width: 100%; height: 100%; }
-
-    .leaflet-control-layers {
-      font-size: 14px;
-      background-color: rgba(255, 255, 255, 0.9);
-    }
-  </style>
+<style>
+  html, body { height: 100%; margin: 0; font-family: "Sarabun", sans-serif; }
+  #map { height: 100%; width: 100%; }
+  #toggleBtn {
+    position: absolute; top: 10px; right: 10px;
+    background: white; border: 1px solid #999;
+    padding: 6px 12px; border-radius: 6px;
+    z-index: 1001; cursor: pointer;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  }
+  .layer-control {
+    position: absolute; top: 50px; right: 10px;
+    background: white; padding: 10px; max-height: 85vh;
+    overflow-y: auto; border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.4);
+    width: 300px; display: none; z-index: 1000;
+  }
+  .layer-item { margin-bottom: 6px; }
+  .basemap-btn {
+    display: inline-block; background: #f2f2f2;
+    border: 1px solid #ccc; padding: 4px 8px; margin: 2px;
+    border-radius: 5px; cursor: pointer;
+  }
+  .basemap-btn.active { background: #d1e7ff; border-color: #007bff; }
+  .map-button {
+    position: absolute; left: 10px; background: white; border: 1px solid #999;
+    border-radius: 6px; padding: 6px; box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    cursor: pointer; z-index: 1001;
+  }
+  #zoomResetBtn { top: 10px; }
+  #zoomToBoundaryBtn { top: 60px; }
+  #locateBtn { top: 110px; }
+</style>
 </head>
 <body>
-  <div id="map"></div>
 
-  <script>
-    // เริ่มต้นแผนที่
-    const map = L.map('map').setView([19.95, 99.8], 12);
+<div id="map"></div>
+<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
+<div id="zoomResetBtn" class="map-button">🔄 รีเซ็ต</div>
+<div id="zoomToBoundaryBtn" class="map-button">📍 ตำบลแม่ยาว</div>
+<div id="locateBtn" class="map-button">📡 ตำแหน่งฉัน</div>
 
-    // พื้นหลัง
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+<div class="layer-control" id="layerControl">
+  <h3>🗺️ แผนที่ฐาน</h3>
+  <div id="basemaps"></div>
+  <h3>📚 ชั้นข้อมูล</h3>
+  <div id="layerList"></div>
+</div>
 
-    // ฟังก์ชันสุ่มสี
-    function randomColor() {
-      const hue = Math.floor(Math.random() * 360);
-      return `hsl(${hue}, 70%, 50%)`;
-    }
+<script>
+const map = L.map('map').setView([19.95, 99.80], 12);
 
-    // โหลดไฟล์ KML ทั้งหมดจากโฟลเดอร์ layers/
-    fetch('https://api.github.com/repos/maeyaocivil/maeyaocivil.github.io/contents/layers')
-      .then(res => res.json())
-      .then(files => {
-        const overlays = {};
+// 🌍 Base layers
+const baseLayers = {
+  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 })
+};
+const defaultLayerKey = "OpenStreetMap";
+baseLayers[defaultLayerKey].addTo(map);
 
-        files.forEach(file => {
-          if (file.name.endsWith('.kml')) {
-            const color = randomColor();
-            const layer = omnivore.kml(`layers/${file.name}`, null, L.geoJson(null, {
-              style: () => ({
-                color: color,
-                weight: 2,
-                opacity: 0.8,
-                fillOpacity: 0.2
-              })
-            })).on('ready', function() {
-              map.fitBounds(layer.getBounds());
-            });
+// 🧭 ปุ่มแผนที่ฐาน
+const basemapsDiv = document.getElementById('basemaps');
+Object.keys(baseLayers).forEach(key => {
+  const btn = document.createElement('div');
+  btn.textContent = key;
+  btn.className = 'basemap-btn' + (key === defaultLayerKey ? ' active' : '');
+  btn.onclick = () => {
+    Object.values(baseLayers).forEach(l => map.removeLayer(l));
+    baseLayers[key].addTo(map);
+    document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+  basemapsDiv.appendChild(btn);
+});
 
-            overlays[file.name.replace('.kml', '')] = layer;
-          }
-        });
+// 🎨 สีหมู่บ้าน (อ้างอิงชื่อ)
+function getVillageColor(name) {
+  const colors = {
+    "หมู่ที่ 1": "#FF5733",
+    "หมู่ที่ 2": "#33B5FF",
+    "หมู่ที่ 3": "#9B59B6",
+    "หมู่ที่ 4": "#27AE60",
+    "หมู่ที่ 5": "#F1C40F",
+    "หมู่ที่ 6": "#E67E22",
+    "หมู่ที่ 7": "#16A085",
+    "หมู่ที่ 8": "#C0392B",
+    "หมู่ที่ 9": "#2ECC71",
+    "หมู่ที่ 10": "#2980B9"
+  };
+  for (const [key, color] of Object.entries(colors)) {
+    if (name.includes(key)) return color;
+  }
+  return "#888"; // default
+}
 
-        L.control.layers(null, overlays, { collapsed: false }).addTo(map);
-      })
-      .catch(err => console.error('โหลดรายชื่อไฟล์ KML ไม่ได้:', err));
-  </script>
+// ⚙️ โหลดรายชื่อไฟล์จาก layers.json
+fetch("layers/layers.json")
+  .then(res => res.json())
+  .then(files => {
+    const listDiv = document.getElementById("layerList");
+
+    files.forEach(filename => {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "layer-item";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = filename;
+
+      const label = document.createElement("label");
+      label.htmlFor = filename;
+      label.textContent = " " + filename.replace(".kml", "");
+
+      itemDiv.appendChild(checkbox);
+      itemDiv.appendChild(label);
+      listDiv.appendChild(itemDiv);
+
+      let layer;
+
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) {
+          layer = omnivore.kml("layers/" + filename)
+            .on("ready", function() {
+              this.eachLayer(l => {
+                let name = filename.replace(".kml", "");
+                if (name.includes("แนวเขตหมู่บ้าน")) {
+                  const color = getVillageColor(l.feature.properties.name || name);
+                  l.setStyle({ color: color, fillColor: color, fillOpacity: 0.4, weight: 2 });
+                } else if (l.feature.geometry.type === "Point") {
+                  const icon = L.circleMarker(l.getLatLng(), {
+                    radius: 6, color: "#333", fillColor: "#1E90FF", fillOpacity: 0.7
+                  });
+                  icon.bindPopup(name);
+                  icon.addTo(map);
+                } else {
+                  l.setStyle({ color: "#007bff", weight: 2, fillOpacity: 0.3 });
+                }
+                l.bindPopup(name);
+              });
+              map.fitBounds(this.getBounds());
+            })
+            .addTo(map);
+        } else if (layer) {
+          map.removeLayer(layer);
+        }
+      });
+    });
+  })
+  .catch(err => {
+    console.error("โหลดรายชื่อไฟล์ KML ไม่ได้:", err);
+  });
+
+// 🧭 ปุ่มควบคุม
+document.getElementById("toggleBtn").onclick = () => {
+  const panel = document.getElementById("layerControl");
+  panel.style.display = panel.style.display === "block" ? "none" : "block";
+};
+
+document.getElementById("zoomResetBtn").onclick = () => map.setView([19.95, 99.80], 12);
+document.getElementById("zoomToBoundaryBtn").onclick = () => {
+  fetch("layers/แนวเขตตำบลแม่ยาว อ้างอิงตาม ทน.ชร,ทต.บ้านดู่ 26-9-68.kml")
+    .then(() => {
+      const tempLayer = omnivore.kml("layers/แนวเขตตำบลแม่ยาว อ้างอิงตาม ทน.ชร,ทต.บ้านดู่ 26-9-68.kml")
+        .on("ready", function() {
+          map.fitBounds(this.getBounds());
+          map.removeLayer(tempLayer);
+        })
+        .addTo(map);
+    });
+};
+document.getElementById("locateBtn").onclick = () => {
+  map.locate({ setView: true, maxZoom: 15 });
+};
+map.on("locationfound", e => {
+  L.circleMarker(e.latlng, { radius: 8, fillColor: "#f03", color: "#fff", fillOpacity: 0.9 }).addTo(map)
+    .bindPopup("📍 คุณอยู่ที่นี่").openPopup();
+});
+</script>
+
 </body>
 </html>
