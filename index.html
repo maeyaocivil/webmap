@@ -13,7 +13,6 @@
   html, body { height: 100%; margin: 0; }
   #map { height: 100%; width: 100%; }
 
-  /* Control Panel Toggle Button */
   #toggleBtn {
     position: absolute;
     top: 10px;
@@ -28,7 +27,6 @@
     font-family: "Sarabun", sans-serif;
   }
 
-  /* Layer Control Box */
   .layer-control {
     position: absolute;
     top: 50px;
@@ -42,7 +40,7 @@
     width: 300px;
     font-family: "Sarabun", sans-serif;
     z-index: 1000;
-    display: none; /* Hidden by default */
+    display: none;
   }
 
   .layer-group-title {
@@ -100,22 +98,19 @@ const map = L.map('map').setView([19.95, 99.80], 12);
 
 // 🗺️ Base Layers
 const baseLayers = {
-  "Google Maps": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-  "Google Hybrid": L.tileLayer('https://mt1.google.com/vt/lyrs=h&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 }),
-  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
+  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
+  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 })
 };
 
-// ⭐️ Set default map to Google Maps
-const defaultLayerKey = "Google Maps";
-baseLayers[defaultLayerKey].addTo(map);
+// Default
+baseLayers["OpenStreetMap"].addTo(map);
 
 // Render basemap buttons
 const basemapsDiv = document.getElementById('basemaps');
 Object.keys(baseLayers).forEach(key => {
   const btn = document.createElement('div');
   btn.textContent = key;
-  btn.className = 'basemap-btn' + (key === defaultLayerKey ? ' active' : '');
+  btn.className = 'basemap-btn' + (key === "OpenStreetMap" ? ' active' : '');
   btn.onclick = () => {
     Object.values(baseLayers).forEach(l => map.removeLayer(l));
     baseLayers[key].addTo(map);
@@ -125,18 +120,18 @@ Object.keys(baseLayers).forEach(key => {
   basemapsDiv.appendChild(btn);
 });
 
-// ✅ Control panel toggle button
-const toggleBtn = document.getElementById('toggleBtn');
-const layerControl = document.getElementById('layerControl');
-toggleBtn.onclick = () => {
-  layerControl.style.display = layerControl.style.display === 'none' ? 'block' : 'none';
+// Toggle control
+document.getElementById('toggleBtn').onclick = () => {
+  const ctrl = document.getElementById('layerControl');
+  ctrl.style.display = ctrl.style.display === 'none' ? 'block' : 'none';
 };
 
-// Load KML layers from layers.json
+// Load KML layers
 fetch('layers.json')
   .then(res => res.json())
   .then(data => {
     const list = document.getElementById('layerList');
+
     data.groups.forEach(group => {
       const title = document.createElement('div');
       title.className = 'layer-group-title';
@@ -146,88 +141,89 @@ fetch('layers.json')
       group.layers.forEach(layerInfo => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'layer-item';
+
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.id = layerInfo.name;
+
         const label = document.createElement('label');
         label.htmlFor = layerInfo.name;
         label.textContent = " " + layerInfo.name;
+
         itemDiv.appendChild(checkbox);
         itemDiv.appendChild(label);
         list.appendChild(itemDiv);
 
         let layer;
-        const initialFillOpacity = 0.4;
-        const initialRadius = 8;
-        const initialWeight = 2;
+        const fillOpacity = 0.5;
+        const weight = 2;
+        const radius = 8;
+        const singleLayerColor = getRandomColor();
 
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
-            // --- 🎨 Color Logic ---
-            const isVillageBoundaryLayer = (layerInfo.name === 'แนวเขตหมู่บ้าน');
-            // Generate one color for the whole layer, unless it's the special village layer
-            const singleLayerColor = isVillageBoundaryLayer ? null : (layerInfo.color || getRandomColor());
+            const isVillage = (layerInfo.name === "แนวเขตหมู่บ้าน");
+            layer = omnivore.kml(layerInfo.file).on('ready', function() {
+              this.eachLayer(l => {
+                // ตรวจว่าข้อมูลเป็นจุดหรือไม่
+                if (l.feature && l.feature.geometry && l.feature.geometry.type === "Point") {
+                  const color = isVillage ? getRandomColor() : singleLayerColor;
+                  const marker = L.circleMarker(l.getLatLng(), {
+                    radius: radius,
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.9,
+                    weight: 1
+                  });
+                  marker.addTo(map);
+                  l.remove();
+                } else {
+                  const color = isVillage ? getRandomColor() : singleLayerColor;
+                  l.setStyle({
+                    color: "#000000",
+                    weight: weight,
+                    fillColor: color,
+                    fillOpacity: fillOpacity
+                  });
+                }
+              });
+            }).addTo(map);
 
-            const kmlOptions = {
-              // For Lines and Polygons
-              style: (feature) => {
-                const featureColor = isVillageBoundaryLayer ? getRandomColor() : singleLayerColor;
-                return {
-                  color: featureColor,
-                  weight: initialWeight,
-                  opacity: 1,
-                  fillOpacity: initialFillOpacity
-                };
-              },
-              // For Points
-              pointToLayer: (feature, latlng) => {
-                const featureColor = isVillageBoundaryLayer ? getRandomColor() : singleLayerColor;
-                return L.circleMarker(latlng, {
-                  radius: initialRadius,
-                  fillColor: featureColor,
-                  color: featureColor, // Border color of the circle
-                  weight: 1,
-                  opacity: 1,
-                  fillOpacity: initialFillOpacity
-                });
-              }
-            };
-            
-            layer = omnivore.kml(layerInfo.file, kmlOptions).addTo(map);
+            // --- สร้าง slider ตามประเภท ---
+            const sampleFeature = layerInfo.name.includes("แนวเขตหมู่บ้าน") ? "polygon" : "auto";
+            if (sampleFeature === "auto" || sampleFeature === "polygon" || sampleFeature === "line") {
+              const opacityDiv = document.createElement('div');
+              opacityDiv.className = 'slider-container';
+              opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="${fillOpacity*100}">`;
+              const opacitySlider = opacityDiv.querySelector('input');
+              opacitySlider.addEventListener('input', () => {
+                const v = opacitySlider.value / 100;
+                layer.eachLayer(f => { if (f.setStyle) f.setStyle({ fillOpacity: v }); });
+              });
+              itemDiv.appendChild(opacityDiv);
 
-            // --- 🎚️ Sliders ---
-            // Opacity Slider
-            const opacityDiv = document.createElement('div');
-            opacityDiv.className = 'slider-container';
-            opacityDiv.innerHTML = `ความทึบแสง: <input type="range" min="0" max="100" value="${initialFillOpacity*100}">`;
-            const opacitySlider = opacityDiv.querySelector('input');
-            opacitySlider.addEventListener('input', () => {
-              const value = opacitySlider.value / 100;
-              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ fillOpacity: value }); });
-            });
-            itemDiv.appendChild(opacityDiv);
+              const weightDiv = document.createElement('div');
+              weightDiv.className = 'slider-container';
+              weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="${weight}">`;
+              const weightSlider = weightDiv.querySelector('input');
+              weightSlider.addEventListener('input', () => {
+                const v = parseFloat(weightSlider.value);
+                layer.eachLayer(f => { if (f.setStyle) f.setStyle({ weight: v }); });
+              });
+              itemDiv.appendChild(weightDiv);
+            }
 
-            // Line Weight Slider
-            const weightDiv = document.createElement('div');
-            weightDiv.className = 'slider-container';
-            weightDiv.innerHTML = `ความหนาเส้น: <input type="range" min="0" max="10" value="${initialWeight}">`;
-            const weightSlider = weightDiv.querySelector('input');
-            weightSlider.addEventListener('input', () => {
-              const value = parseFloat(weightSlider.value);
-              layer.eachLayer(l => { if (l.setStyle) l.setStyle({ weight: value }); });
-            });
-            itemDiv.appendChild(weightDiv);
-            
-            // Point Radius Slider
-            const radiusDiv = document.createElement('div');
-            radiusDiv.className = 'slider-container';
-            radiusDiv.innerHTML = `ขนาดจุด: <input type="range" min="1" max="20" value="${initialRadius}">`;
-            const radiusSlider = radiusDiv.querySelector('input');
-            radiusSlider.addEventListener('input', () => {
-              const value = parseFloat(radiusSlider.value);
-              layer.eachLayer(l => { if (typeof l.setRadius === 'function') l.setRadius(value); });
-            });
-            itemDiv.appendChild(radiusDiv);
+            if (layerInfo.name.includes("ข้อมูล") || layerInfo.name.includes("สถานที่") || layerInfo.name.includes("กิจการ")) {
+              const radiusDiv = document.createElement('div');
+              radiusDiv.className = 'slider-container';
+              radiusDiv.innerHTML = `ขนาดจุด: <input type="range" min="2" max="20" value="${radius}">`;
+              const radiusSlider = radiusDiv.querySelector('input');
+              radiusSlider.addEventListener('input', () => {
+                const v = parseFloat(radiusSlider.value);
+                layer.eachLayer(f => { if (f.setRadius) f.setRadius(v); });
+              });
+              itemDiv.appendChild(radiusDiv);
+            }
 
           } else {
             if (layer) map.removeLayer(layer);
@@ -239,7 +235,6 @@ fetch('layers.json')
   })
   .catch(err => console.error("Error loading layers.json:", err));
 
-// Random color generator
 function getRandomColor() {
   return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
 }
