@@ -13,7 +13,6 @@
   html, body { height: 100%; margin: 0; font-family: "Sarabun", sans-serif; background: #eef3f8; }
   #map { height: 100%; width: 100%; }
 
-  /* ปุ่มหลัก */
   #toggleBtn {
     position: absolute; top: 15px; right: 15px;
     background: white; border: 1px solid #ccc;
@@ -22,7 +21,6 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   }
 
-  /* กล่องชั้นข้อมูล */
   .layer-control {
     position: absolute; top: 60px; right: 15px;
     background: white; padding: 10px; max-height: 85vh;
@@ -30,8 +28,9 @@
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
     width: 280px; display: none; z-index: 1000;
   }
-  .layer-item { margin-left: 10px; margin-bottom: 10px; }
-  .slider-container { margin: 3px 0 5px 20px; font-size: 0.85em; color: #333; }
+
+  .layer-item { margin-bottom: 10px; }
+  .slider-container { margin: 4px 0 4px 20px; font-size: 0.85em; color: #333; display: none; }
   .slider-container input[type="range"] { width: 85%; }
 
   .basemap-btn {
@@ -41,7 +40,6 @@
   }
   .basemap-btn.active { background: #cce5ff; border-color: #007bff; }
 
-  /* ปุ่มซ้าย */
   .map-btn {
     position: absolute; left: 15px;
     background: white; padding: 6px 10px;
@@ -52,7 +50,6 @@
   #resetBtn { top: 15px; }
   #locateBtn { top: 60px; }
 
-  /* ปรับระยะปุ่ม + - */
   .leaflet-control-zoom { margin-top: 110px !important; }
 </style>
 </head>
@@ -96,7 +93,6 @@ Object.keys(baseLayers).forEach(key => {
   basemapsDiv.appendChild(btn);
 });
 
-// เปิด/ปิดกล่องชั้นข้อมูล
 document.getElementById('toggleBtn').onclick = () => {
   const ctrl = document.getElementById('layerControl');
   ctrl.style.display = ctrl.style.display === 'none' ? 'block' : 'none';
@@ -113,7 +109,6 @@ function colorByVillage(name) {
   return '#'+Math.floor(Math.random()*16777215).toString(16);
 }
 
-// โหลดไฟล์ KML ทั้งหมด
 fetch('layers/layers.json')
 .then(res => res.json())
 .then(files => {
@@ -125,41 +120,83 @@ fetch('layers/layers.json')
     div.innerHTML = `<input type="checkbox" id="${name}"> <label for="${name}">${name}</label>`;
     list.appendChild(div);
 
+    // slider container
+    const sliderDiv = document.createElement('div');
+    sliderDiv.className = 'slider-container';
+    sliderDiv.innerHTML = `
+      <div class="opacity-slider">
+        ความทึบ <input type="range" min="0" max="1" step="0.1" value="0.5">
+      </div>
+      <div class="weight-slider">
+        ความหนาเส้น <input type="range" min="1" max="10" step="1" value="2">
+      </div>
+      <div class="point-slider">
+        ขนาดจุด <input type="range" min="3" max="20" step="1" value="7">
+      </div>`;
+    list.appendChild(sliderDiv);
+
     const layerGroup = L.layerGroup();
-    let geoLayer;
+    let geojsonFeatures = [];
 
-    const addLayer = () => {
-      geoLayer = omnivore.kml(`layers/${fileName}`)
-      .on('ready', function() {
-        const geojson = this.toGeoJSON();
-        const typeSet = new Set(geojson.features.map(f => f.geometry.type));
-        const color = fileName.includes("แนวเขตหมู่บ้าน") ? null : colorByVillage(name);
+    const checkbox = document.getElementById(name);
+    const opacitySlider = sliderDiv.querySelector('.opacity-slider input');
+    const weightSlider = sliderDiv.querySelector('.weight-slider input');
+    const pointSlider = sliderDiv.querySelector('.point-slider input');
 
-        this.eachLayer(f => {
-          const type = f.feature.geometry.type;
-          let style = {};
-          if (type === "Point") {
-            const c = color || colorByVillage(f.feature.properties.name || name);
-            style = { radius: 7, fillColor: c, color: "#333", weight: 1, fillOpacity: 0.8 };
-            const latlng = f.getLatLng();
-            const marker = L.circleMarker(latlng, style).bindPopup(name);
-            layerGroup.addLayer(marker);
-          } else {
-            const c = color || colorByVillage(f.feature.properties.name || name);
-            style = { color: c, weight: 2, fillColor: c, fillOpacity: 0.5 };
-            f.setStyle(style);
-            f.bindPopup(name);
-            layerGroup.addLayer(f);
-          }
-        });
-        layerGroup.addTo(map);
+    function applyStyle() {
+      layerGroup.clearLayers();
+      geojsonFeatures.forEach(f => {
+        const type = f.geometry.type;
+        const color = colorByVillage(f.properties.name || name);
+        if (type === "Point") {
+          const marker = L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
+            radius: parseFloat(pointSlider.value),
+            fillColor: color,
+            color: "#333",
+            weight: 1,
+            fillOpacity: parseFloat(opacitySlider.value)
+          }).bindPopup(name);
+          layerGroup.addLayer(marker);
+        } else {
+          const style = {
+            color: color,
+            weight: parseFloat(weightSlider.value),
+            fillColor: color,
+            fillOpacity: parseFloat(opacitySlider.value)
+          };
+          const layer = L.geoJSON(f, { style }).bindPopup(name);
+          layerGroup.addLayer(layer);
+        }
       });
-    };
+    }
 
-    // toggle
-    document.getElementById(name).addEventListener('change', e => {
-      if (e.target.checked) addLayer();
-      else map.removeLayer(layerGroup);
+    function addLayer() {
+      omnivore.kml(`layers/${fileName}`).on('ready', function() {
+        geojsonFeatures = this.toGeoJSON().features;
+        applyStyle();
+        layerGroup.addTo(map);
+
+        // ตรวจชนิด
+        const hasPoint = geojsonFeatures.some(f => f.geometry.type === 'Point');
+        const hasLineOrPoly = geojsonFeatures.some(f => f.geometry.type !== 'Point');
+        sliderDiv.querySelector('.point-slider').style.display = hasPoint ? 'block' : 'none';
+        sliderDiv.querySelector('.opacity-slider').style.display = hasLineOrPoly ? 'block' : 'block';
+        sliderDiv.querySelector('.weight-slider').style.display = hasLineOrPoly ? 'block' : 'none';
+        sliderDiv.style.display = 'block';
+      });
+    }
+
+    opacitySlider.addEventListener('input', applyStyle);
+    weightSlider.addEventListener('input', applyStyle);
+    pointSlider.addEventListener('input', applyStyle);
+
+    checkbox.addEventListener('change', e => {
+      if (e.target.checked) {
+        addLayer();
+      } else {
+        map.removeLayer(layerGroup);
+        sliderDiv.style.display = 'none';
+      }
     });
   });
 });
