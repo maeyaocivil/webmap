@@ -1,225 +1,242 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8" />
-<title>OneMap - เทศบาลตำบลแม่ยาว</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OneMap - เทศบาลตำบลแม่ยาว</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<style>
-html, body { height: 100%; margin: 0; font-family: "Sarabun", sans-serif; background: #eef3f8; }
-#map { height: 100%; width: 100%; }
+  <!-- KML -->
+  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
-/* ปุ่ม */
-.map-btn {
-  position: absolute; left: 15px;
-  background: white; padding: 6px 10px;
-  border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-  border: 1px solid #ccc; cursor: pointer;
-  z-index: 1001; font-size: 14px;
-}
-#resetBtn { top: 15px; }
-#locateBtn { top: 60px; }
+  <!-- Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 
-/* ปุ่มชั้นข้อมูล */
-#toggleBtn {
-  position: absolute; top: 15px; right: 15px;
-  background: white; border: 1px solid #ccc;
-  padding: 6px 12px; border-radius: 8px;
-  z-index: 1001; cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-}
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
 
-/* กล่องควบคุม */
-.layer-control {
-  position: absolute; top: 60px; right: 15px;
-  background: white; padding: 10px;
-  max-height: 85vh; overflow-y: auto;
-  border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-  width: 280px; display: none; z-index: 1000;
-}
+    /* ปรับธีมทางราชการ */
+    body {
+      font-family: "Sarabun", sans-serif;
+      background: #f7f7f7;
+    }
 
-.layer-item { margin-bottom: 10px; }
-.slider-container { margin: 4px 0 4px 20px; font-size: 0.85em; display: none; }
-.slider-container input[type="range"] { width: 85%; }
+    /* ปุ่มควบคุมหลัก */
+    .leaflet-control.custom-control {
+      background: white;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      margin: 5px;
+      padding: 4px 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #333;
+    }
+    .leaflet-control.custom-control:hover {
+      background: #f0f0f0;
+    }
 
-.basemap-btn {
-  display: inline-block; background: #f8f9fa;
-  border: 1px solid #ccc; padding: 4px 8px; margin: 2px;
-  border-radius: 5px; cursor: pointer;
-}
-.basemap-btn.active { background: #cce5ff; border-color: #007bff; }
+    /* กล่องชั้นข้อมูล */
+    .layer-controls {
+      padding: 8px;
+      font-size: 13px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
 
-.leaflet-control-zoom { margin-top: 110px !important; }
-</style>
+    /* slider */
+    .slider-group {
+      margin-left: 10px;
+      font-size: 12px;
+      color: #444;
+    }
+    .slider-group input[type="range"] {
+      width: 120px;
+      accent-color: #0066cc;
+    }
+
+    /* เข็มทิศ */
+    .compass {
+      background: white;
+      border-radius: 6px;
+      border: 1px solid #bbb;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      padding: 4px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    /* มาตราส่วน */
+    .scale-display {
+      position: absolute;
+      bottom: 30px;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+    }
+  </style>
 </head>
-
 <body>
-<div id="map"></div>
-<div id="resetBtn" class="map-btn">📍 รีเซ็ต ตำบลแม่ยาว</div>
-<div id="locateBtn" class="map-btn">📡 ตำแหน่งฉัน</div>
-<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
+  <div id="map"></div>
+  <div class="scale-display" id="scaleDisplay">มาตราส่วน 1:---</div>
 
-<div class="layer-control" id="layerControl">
-  <h3>🗺️ แผนที่ฐาน</h3>
-  <div id="basemaps"></div><hr>
-  <h3>📚 ชั้นข้อมูล</h3>
-  <div id="layerList"></div>
-</div>
-
-<script>
-const map = L.map('map').setView([19.95, 99.80], 12);
-
-// 🗺️ แผนที่ฐาน
-const baseLayers = {
-  "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
-  "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 })
-};
-baseLayers["OpenStreetMap"].addTo(map);
-
-// ปุ่มเปลี่ยนแผนที่ฐาน
-const basemapsDiv = document.getElementById('basemaps');
-Object.keys(baseLayers).forEach(key => {
-  const btn = document.createElement('div');
-  btn.textContent = key;
-  btn.className = 'basemap-btn' + (key === "OpenStreetMap" ? ' active' : '');
-  btn.onclick = () => {
-    Object.values(baseLayers).forEach(l => map.removeLayer(l));
-    baseLayers[key].addTo(map);
-    document.querySelectorAll('.basemap-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  };
-  basemapsDiv.appendChild(btn);
-});
-
-// ปุ่มเปิด/ปิดชั้นข้อมูล
-document.getElementById('toggleBtn').onclick = () => {
-  const ctrl = document.getElementById('layerControl');
-  ctrl.style.display = ctrl.style.display === 'none' ? 'block' : 'none';
-};
-
-// 🎨 สีคงที่ต่อไฟล์
-const fixedColors = {};
-function getFixedColor(name) {
-  if (!fixedColors[name]) {
-    const hash = Array.from(name).reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    const hue = hash % 360;
-    fixedColors[name] = `hsl(${hue},70%,60%)`;
-  }
-  return fixedColors[name];
-}
-
-// 🎨 สีหมู่บ้านคงที่ 20 หมู่
-const villageColors = {
-  "หมู่ที่ 1": "#ff0000", "หมู่ที่ 2": "#ff6600", "หมู่ที่ 3": "#ffcc00", "หมู่ที่ 4": "#99cc00",
-  "หมู่ที่ 5": "#00cc00", "หมู่ที่ 6": "#00cccc", "หมู่ที่ 7": "#0099ff", "หมู่ที่ 8": "#0033cc",
-  "หมู่ที่ 9": "#6600cc", "หมู่ที่ 10": "#cc00cc", "หมู่ที่ 11": "#cc0066", "หมู่ที่ 12": "#ff3366",
-  "หมู่ที่ 13": "#cc9900", "หมู่ที่ 14": "#669900", "หมู่ที่ 15": "#339966", "หมู่ที่ 16": "#006699",
-  "หมู่ที่ 17": "#663399", "หมู่ที่ 18": "#993366", "หมู่ที่ 19": "#999999", "หมู่ที่ 20": "#333333"
-};
-function colorByVillage(name) {
-  for (let k in villageColors) if (name.includes(k)) return villageColors[k];
-  return getFixedColor(name);
-}
-
-// 📚 โหลดชั้นข้อมูล
-fetch('layers/layers.json').then(r => r.json()).then(files => {
-  const list = document.getElementById('layerList');
-  files.forEach(fileName => {
-    const name = fileName.replace('.kml', '');
-    const div = document.createElement('div');
-    div.className = 'layer-item';
-    div.innerHTML = `<input type="checkbox" id="${name}"> <label for="${name}">${name}</label>`;
-    list.appendChild(div);
-
-    const sliderDiv = document.createElement('div');
-    sliderDiv.className = 'slider-container';
-    sliderDiv.innerHTML = `
-      <div class="opacity-slider">ความทึบ <input type="range" min="0" max="1" step="0.1" value="0.5"></div>
-      <div class="weight-slider">ความหนาเส้น <input type="range" min="1" max="10" step="1" value="2"></div>
-      <div class="point-slider">ขนาดจุด <input type="range" min="3" max="20" step="1" value="7"></div>`;
-    list.appendChild(sliderDiv);
-
-    const layerGroup = L.layerGroup();
-    let geojsonFeatures = [];
-
-    const checkbox = document.getElementById(name);
-    const opacitySlider = sliderDiv.querySelector('.opacity-slider input');
-    const weightSlider = sliderDiv.querySelector('.weight-slider input');
-    const pointSlider = sliderDiv.querySelector('.point-slider input');
-
-    function applyStyle() {
-      layerGroup.clearLayers();
-      geojsonFeatures.forEach(f => {
-        const type = f.geometry.type;
-        const color = (fileName.includes("แนวเขตหมู่บ้าน") ? colorByVillage(f.properties.name || '') : getFixedColor(fileName));
-        if (type === "Point") {
-          const marker = L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
-            radius: +pointSlider.value,
-            fillColor: color,
-            color: "#333",
-            weight: 1,
-            fillOpacity: +opacitySlider.value
-          }).bindPopup(f.properties.name || name);
-          layerGroup.addLayer(marker);
-        } else {
-          const layer = L.geoJSON(f, {
-            style: {
-              color, fillColor: color,
-              weight: +weightSlider.value,
-              fillOpacity: +opacitySlider.value
-            }
-          }).bindPopup(f.properties.name || name);
-          layerGroup.addLayer(layer);
-        }
-      });
-    }
-
-    function addLayer() {
-      omnivore.kml(`layers/${fileName}`).on('ready', function() {
-        geojsonFeatures = this.toGeoJSON().features;
-        applyStyle();
-        layerGroup.addTo(map);
-        const hasPoint = geojsonFeatures.some(f => f.geometry.type === 'Point');
-        const hasPoly = geojsonFeatures.some(f => f.geometry.type !== 'Point');
-        sliderDiv.querySelector('.point-slider').style.display = hasPoint ? 'block' : 'none';
-        sliderDiv.querySelector('.opacity-slider').style.display = hasPoly ? 'block' : 'block';
-        sliderDiv.querySelector('.weight-slider').style.display = hasPoly ? 'block' : 'none';
-        sliderDiv.style.display = 'block';
-      });
-    }
-
-    checkbox.onchange = e => {
-      if (e.target.checked) addLayer();
-      else { map.removeLayer(layerGroup); sliderDiv.style.display = 'none'; }
-    };
-    [opacitySlider, weightSlider, pointSlider].forEach(sl => sl.oninput = applyStyle);
-  });
-});
-
-// 📍 รีเซ็ต
-document.getElementById('resetBtn').onclick = () => map.setView([19.95, 99.80], 12);
-
-// 📡 ตำแหน่งฉัน
-let locateActive = false, locateMarker;
-const locateBtn = document.getElementById('locateBtn');
-locateBtn.onclick = () => {
-  locateActive = !locateActive;
-  if (locateActive) {
-    locateBtn.style.background = '#cce5ff';
-    map.locate({ setView: true, maxZoom: 16 });
-    map.once('locationfound', e => {
-      if (locateMarker) locateMarker.remove();
-      locateMarker = L.marker(e.latlng).addTo(map).bindPopup("ตำแหน่งของคุณ").openPopup();
+  <script>
+    // ตั้งค่าแผนที่
+    const map = L.map('map', {
+      center: [19.953, 99.769],
+      zoom: 13
     });
-  } else {
-    locateBtn.style.background = 'white';
-    if (locateMarker) { map.removeLayer(locateMarker); locateMarker = null; }
-  }
-};
-</script>
+
+    // แผนที่ฐาน
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      attribution: '© Google Satellite'
+    });
+
+    const baseLayers = {
+      "🗺️ OpenStreetMap": osm,
+      "🛰️ Google Satellite": googleSat
+    };
+
+    const overlayLayers = {};
+    const colors = {
+      "หมู่ที่ 1": "#f94144", "หมู่ที่ 2": "#f3722c", "หมู่ที่ 3": "#f9c74f",
+      "หมู่ที่ 4": "#90be6d", "หมู่ที่ 5": "#43aa8b", "หมู่ที่ 6": "#577590",
+      "หมู่ที่ 7": "#277da1", "หมู่ที่ 8": "#4d908e", "หมู่ที่ 9": "#f9844a",
+      "หมู่ที่ 10": "#ff6f61"
+    };
+
+    // โหลด layers.json
+    fetch('layers/layers.json')
+      .then(res => res.json())
+      .then(files => {
+        files.forEach(file => {
+          const path = 'layers/' + file;
+          const layer = omnivore.kml(path)
+            .on('ready', function() {
+              this.eachLayer(l => {
+                const name = file.replace('.kml','');
+                if (l.feature && l.feature.properties && l.feature.properties.name) {
+                  const fname = l.feature.properties.name;
+                  // สีหมู่บ้านตามชื่อ
+                  for (const [k, c] of Object.entries(colors)) {
+                    if (fname.includes(k)) {
+                      l.setStyle({ color: c, fillColor: c, fillOpacity: 0.4 });
+                    }
+                  }
+                  l.bindPopup(`<b>${fname}</b><br>${name}`);
+                }
+              });
+            })
+            .addTo(map);
+
+          overlayLayers[file] = layer;
+        });
+
+        // สร้าง control ชั้นข้อมูล
+        const layerControl = L.control.layers(baseLayers, overlayLayers, {collapsed:false}).addTo(map);
+
+        // เพิ่ม slider ควบคุมแต่ละชั้น
+        const container = layerControl.getContainer();
+        const list = container.querySelector('.leaflet-control-layers-overlays');
+        Object.keys(overlayLayers).forEach(file => {
+          const label = Array.from(list.querySelectorAll('label')).find(l => l.textContent.includes(file));
+          if (label) {
+            const div = document.createElement('div');
+            div.className = 'slider-group';
+            div.innerHTML = `
+              <div>ทึบ: <input type="range" min="0" max="1" step="0.1" value="0.8" data-type="opacity" data-file="${file}"></div>
+              <div>หนา: <input type="range" min="1" max="10" step="1" value="2" data-type="weight" data-file="${file}"></div>
+              <div>จุด: <input type="range" min="4" max="20" step="1" value="8" data-type="radius" data-file="${file}"></div>
+            `;
+            label.appendChild(div);
+          }
+        });
+
+        // slider event
+        container.addEventListener('input', e => {
+          const type = e.target.dataset.type;
+          const file = e.target.dataset.file;
+          const val = parseFloat(e.target.value);
+          const layer = overlayLayers[file];
+          if (!layer) return;
+          layer.eachLayer(l => {
+            if (l.setStyle && (type === 'opacity' || type === 'weight')) {
+              const st = {};
+              if (type === 'opacity') st.fillOpacity = val, st.opacity = val;
+              if (type === 'weight') st.weight = val;
+              l.setStyle(st);
+            }
+            if (l.setRadius && type === 'radius') {
+              l.setRadius(val);
+            }
+          });
+        });
+      });
+
+    // ปุ่มตำแหน่งฉัน
+    let userMarker;
+    const locateBtn = L.control({ position: 'topleft' });
+    locateBtn.onAdd = function() {
+      const div = L.DomUtil.create('div', 'leaflet-control custom-control');
+      div.innerHTML = '<span class="material-symbols-outlined">my_location</span> ตำแหน่งฉัน';
+      div.onclick = () => {
+        if (userMarker) {
+          map.removeLayer(userMarker);
+          userMarker = null;
+        } else {
+          map.locate({setView:true, maxZoom:17});
+        }
+      };
+      return div;
+    };
+    locateBtn.addTo(map);
+    map.on('locationfound', e => {
+      userMarker = L.marker(e.latlng).addTo(map).bindPopup("คุณอยู่ที่นี่").openPopup();
+    });
+
+    // ปุ่มรีเซ็ต
+    const resetBtn = L.control({ position: 'topleft' });
+    resetBtn.onAdd = function() {
+      const div = L.DomUtil.create('div', 'leaflet-control custom-control');
+      div.innerHTML = '<span class="material-symbols-outlined">refresh</span> รีเซ็ตตำบลแม่ยาว';
+      div.onclick = () => map.setView([19.953, 99.769], 13);
+      return div;
+    };
+    resetBtn.addTo(map);
+
+    // เข็มทิศ
+    const compass = L.control({ position: 'topright' });
+    compass.onAdd = function() {
+      const div = L.DomUtil.create('div', 'compass');
+      div.innerHTML = '🧭 N';
+      return div;
+    };
+    compass.addTo(map);
+
+    // มาตราส่วน
+    function updateScale() {
+      const metersPerPixel = 40075016.686 * Math.abs(Math.cos(map.getCenter().lat * Math.PI / 180)) / Math.pow(2, map.getZoom() + 8);
+      const scale = Math.round(metersPerPixel * 100); // 100px
+      document.getElementById('scaleDisplay').innerText = `มาตราส่วน 1:${scale}`;
+    }
+    map.on('zoomend moveend', updateScale);
+    updateScale();
+  </script>
 </body>
 </html>
