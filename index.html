@@ -254,4 +254,17 @@
     const M = a*((1 - e*e/4 - 3*e**4/64 - 5*e**6/256)*lat*Math.PI/180
       - (3*e**2/8 + 3*e**4/32 + 45*e**6/1024)*Math.sin(2*lat*Math.PI/180)
       + (15*e**4/256 + 45*e**6/1024)*Math.sin(4*lat*Math.PI/180)
-      - (35*e*
+      - (35*e**6/3072)*Math.sin(6*lat*Math.PI/180));
+
+    const Easting = 500000 + k0 * N * (A + (1 - T + C) * A**3 / 6
+      + (5 - 18*T + T**2 + 72*C - 58*(e**2/(1 - e**2))) * A**5 / 120);
+
+    const Northing = k0 * (M + N * Math.tan(lat * Math.PI/180)
+      * (A**2 / 2 + (5 - T + 9*C + 4*C**2) * A**4 / 24
+      + (61 - 58*T + T**2 + 600*C - 330*(e**2/(1 - e**2))) * A**6 / 720));
+
+    return { Easting, Northing };
+  }
+</script>
+</body>
+</html>
