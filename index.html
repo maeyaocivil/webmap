@@ -13,35 +13,20 @@
 <!-- KML -->
 <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
-<!-- Scale / Compass -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-compass/dist/leaflet-compass.css" />
-<script src="https://unpkg.com/leaflet-compass/dist/leaflet-compass.min.js"></script>
-
 <style>
-  html, body, #map { height: 100%; margin: 0; }
+  html, body, #map { height: 100%; margin: 0; font-family: "TH Sarabun New", sans-serif; }
 
-  .leaflet-top.leaflet-left {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    margin-top: 6px;
-    margin-left: 6px;
-  }
-
+  /* โลโก้มุมบนซ้าย */
   .logo {
     background: white;
     border-radius: 8px;
-    padding: 4px;
-    cursor: pointer;
+    padding: 3px;
     box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    cursor: pointer;
   }
+  .logo img { width: 48px; height: 48px; }
 
-  .logo img {
-    width: 48px;
-    height: 48px;
-  }
-
+  /* ปุ่มมุมซ้ายล่าง */
   .bottom-left-controls {
     position: absolute;
     bottom: 15px;
@@ -50,20 +35,16 @@
     gap: 10px;
     align-items: center;
   }
-
   .map-btn {
     background: white;
     border: 1px solid #999;
     border-radius: 6px;
-    padding: 5px 10px;
+    padding: 6px 10px;
     cursor: pointer;
     font-size: 13px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   }
-
-  .map-btn:hover {
-    background: #f2f2f2;
-  }
+  .map-btn:hover { background: #f2f2f2; }
 
   #coord-display {
     background: white;
@@ -73,28 +54,43 @@
     border: 1px solid #999;
   }
 
-  .opacity-slider {
-    width: 90%;
-    margin-top: 3px;
-  }
-
+  /* เข็มทิศมุมขวาบน */
   .compass {
-    width: 50px;
-    height: 50px;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 55px;
+    height: 55px;
     background: white;
     border-radius: 50%;
-    position: relative;
     box-shadow: 0 0 6px rgba(0,0,0,0.3);
   }
-
+  .compass::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 15px solid red;
+  }
   .compass::after {
     content: "N";
     color: red;
     font-weight: bold;
     position: absolute;
-    top: 5px;
+    top: 3px;
     left: 50%;
     transform: translateX(-50%);
+    font-size: 14px;
+  }
+
+  .opacity-slider {
+    width: 90%;
+    margin-top: 3px;
   }
 
   .layer-control {
@@ -104,13 +100,17 @@
     max-height: 400px;
     overflow-y: auto;
     box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    font-size: 14px;
   }
-
 </style>
 </head>
 <body>
 <div id="map"></div>
 
+<!-- เข็มทิศ -->
+<div class="compass" title="ทิศเหนือ"></div>
+
+<!-- ปุ่มมุมซ้ายล่าง -->
 <div class="bottom-left-controls">
   <button id="resetBtn" class="map-btn">รีเซ็ต ตำบลแม่ยาว</button>
   <button id="locateBtn" class="map-btn">ตำแหน่งฉัน</button>
@@ -118,10 +118,10 @@
 </div>
 
 <script>
-  // 🗺️ สร้างแผนที่
-  const map = L.map("map").setView([19.935, 99.791], 13);
+  // สร้างแผนที่
+  const map = L.map("map", { zoomControl: false }).setView([19.935, 99.791], 13);
 
-  // 🔹 Base Maps
+  // Base Maps
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap'
@@ -133,10 +133,13 @@
 
   const baseMaps = { "🗺️ OpenStreetMap": osm, "🌍 Google Satellite": googleSat };
 
-  // 🔹 กล่องชั้นข้อมูล
+  // กล่องชั้นข้อมูล
   const layerControl = L.control.layers(baseMaps, null, { collapsed: false }).addTo(map);
 
-  // 🔹 โลโก้เทศบาล
+  // เพิ่มปุ่ม + -
+  L.control.zoom({ position: 'topleft' }).addTo(map);
+
+  // โลโก้เทศบาล
   const logoControl = L.control({ position: 'topleft' });
   logoControl.onAdd = function() {
     const div = L.DomUtil.create('div', 'logo');
@@ -145,18 +148,10 @@
   };
   logoControl.addTo(map);
 
-  // 🔹 มาตราส่วน (มีขีด)
+  // มาตราส่วน (มีเส้นและเลข)
   L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
 
-  // 🔹 เข็มทิศ
-  const compass = L.control({ position: 'topright' });
-  compass.onAdd = function() {
-    const div = L.DomUtil.create('div', 'compass');
-    return div;
-  };
-  compass.addTo(map);
-
-  // 📂 โหลดชั้นข้อมูลจาก layers.json
+  // โหลดข้อมูล KML ทั้งหมด
   fetch("layers/layers.json")
     .then(r => r.json())
     .then(files => {
@@ -165,16 +160,11 @@
           .on("ready", function() {
             const name = file.replace(".kml", "");
             const lyr = this;
-
-            // 🖌️ ตรวจประเภท geometry
             let geomType = null;
             lyr.eachLayer(l => {
-              if (l.feature && l.feature.geometry) {
-                geomType = l.feature.geometry.type;
-              }
+              if (l.feature && l.feature.geometry) geomType = l.feature.geometry.type;
             });
 
-            // 🔹 ควบคุมการตั้งค่า
             const div = L.DomUtil.create('div', 'layer-control');
             div.innerHTML = `<b>${name}</b><br>`;
             if (geomType && geomType.includes("Point")) {
@@ -184,7 +174,6 @@
               div.innerHTML += `หนา: <input type="range" min="1" max="8" step="1" value="3" class="opacity-slider" id="weight-${name}"><br>`;
             }
 
-            // ✳️ ใส่ event ปรับค่าทันที
             div.querySelectorAll('input').forEach(inp => {
               inp.addEventListener('input', () => {
                 lyr.eachLayer(l => {
@@ -206,12 +195,12 @@
       });
     });
 
-  // 📍 ปุ่มรีเซ็ตตำแหน่ง
+  // ปุ่มรีเซ็ต
   document.getElementById("resetBtn").onclick = () => {
     map.setView([19.935, 99.791], 13);
   };
 
-  // 📍 ปุ่มตำแหน่งฉัน
+  // ปุ่มตำแหน่งฉัน
   let userMarker = null;
   let locateOn = false;
   document.getElementById("locateBtn").onclick = () => {
@@ -225,20 +214,19 @@
       document.getElementById("locateBtn").textContent = "ตำแหน่งฉัน";
     }
   };
-
   map.on('locationfound', e => {
     if (userMarker) map.removeLayer(userMarker);
     userMarker = L.marker(e.latlng).addTo(map);
   });
 
-  // 📍 แสดงพิกัด E,N (UTM)
+  // แสดงพิกัด UTM (E,N)
   map.on("mousemove", function(e) {
     const utm = LLtoUTM(e.latlng.lat, e.latlng.lng);
     document.getElementById("coord-display").textContent =
       `E: ${utm.Easting.toFixed(1)}, N: ${utm.Northing.toFixed(1)}`;
   });
 
-  // 🔢 ฟังก์ชันแปลง LatLong → UTM (Zone 47N สำหรับเชียงราย)
+  // แปลง LatLong → UTM Zone 47N
   function LLtoUTM(lat, lon) {
     const zone = 47;
     const a = 6378137.0;
@@ -250,21 +238,17 @@
     const T = Math.tan(lat * Math.PI/180)**2;
     const C = (e * e / (1 - e * e)) * Math.cos(lat * Math.PI/180)**2;
     const A = Math.cos(lat * Math.PI/180) * (lon - lonOrigin) * Math.PI/180;
-
     const M = a*((1 - e*e/4 - 3*e**4/64 - 5*e**6/256)*lat*Math.PI/180
       - (3*e**2/8 + 3*e**4/32 + 45*e**6/1024)*Math.sin(2*lat*Math.PI/180)
       + (15*e**4/256 + 45*e**6/1024)*Math.sin(4*lat*Math.PI/180)
       - (35*e**6/3072)*Math.sin(6*lat*Math.PI/180));
-
     const Easting = 500000 + k0 * N * (A + (1 - T + C) * A**3 / 6
       + (5 - 18*T + T**2 + 72*C - 58*(e**2/(1 - e**2))) * A**5 / 120);
-
     const Northing = k0 * (M + N * Math.tan(lat * Math.PI/180)
       * (A**2 / 2 + (5 - T + 9*C + 4*C**2) * A**4 / 24
       + (61 - 58*T + T**2 + 600*C - 330*(e**2/(1 - e**2))) * A**6 / 720));
-
     return { Easting, Northing };
   }
 </script>
 </body>
-</html>
+</html
