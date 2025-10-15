@@ -9,22 +9,13 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- KML -->
+  <!-- Omnivore (KML) -->
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
-
-  <!-- Icons -->
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 
   <style>
     html, body, #map { height: 100%; margin: 0; }
+    body { font-family: "Sarabun", sans-serif; background: #f7f7f7; }
 
-    /* ปรับธีมทางราชการ */
-    body {
-      font-family: "Sarabun", sans-serif;
-      background: #f7f7f7;
-    }
-
-    /* ปุ่มควบคุมหลัก */
     .leaflet-control.custom-control {
       background: white;
       border: 1px solid #bbb;
@@ -36,19 +27,8 @@
       font-size: 14px;
       color: #333;
     }
-    .leaflet-control.custom-control:hover {
-      background: #f0f0f0;
-    }
+    .leaflet-control.custom-control:hover { background: #f0f0f0; }
 
-    /* กล่องชั้นข้อมูล */
-    .layer-controls {
-      padding: 8px;
-      font-size: 13px;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    /* slider */
     .slider-group {
       margin-left: 10px;
       font-size: 12px;
@@ -59,7 +39,6 @@
       accent-color: #0066cc;
     }
 
-    /* เข็มทิศ */
     .compass {
       background: white;
       border-radius: 6px;
@@ -67,12 +46,10 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       padding: 4px;
       text-align: center;
-      font-size: 14px;
       font-weight: bold;
     }
 
-    /* มาตราส่วน */
-    .scale-display {
+    .scale-display, .utm-display {
       position: absolute;
       bottom: 30px;
       left: 10px;
@@ -83,28 +60,61 @@
       font-size: 13px;
       font-weight: 500;
       color: #333;
+      margin-bottom: 5px;
     }
+    .utm-display { bottom: 60px; }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div class="utm-display" id="utmDisplay">E: -, N: -</div>
   <div class="scale-display" id="scaleDisplay">มาตราส่วน 1:---</div>
 
   <script>
-    // ตั้งค่าแผนที่
-    const map = L.map('map', {
-      center: [19.953, 99.769],
-      zoom: 13
-    });
+    // แปลง LatLng → UTM
+    function latLngToUTM(lat, lon) {
+      const a = 6378137.0;
+      const f = 1 / 298.257223563;
+      const k0 = 0.9996;
+      const lonOrigin = Math.floor((lon + 180) / 6) * 6 - 183;
+      const e = Math.sqrt(f * (2 - f));
+      const n = f / (2 - f);
+      const A = a / (1 + n) * (1 + n ** 2 / 4 + n ** 4 / 64);
 
-    // แผนที่ฐาน
+      const λ = (lon - lonOrigin) * Math.PI / 180;
+      const φ = lat * Math.PI / 180;
+
+      const α = [null,
+        n/2 - 2*n**2/3 + 5*n**3/16,
+        13*n**2/48 - 3*n**3/5,
+        61*n**3/240
+      ];
+
+      const β = [null,
+        n/2 - 2*n**2/3 + 37*n**3/96,
+        n**2/48 + n**3/15,
+        17*n**3/480
+      ];
+
+      const t = Math.sinh(Math.atanh(Math.sin(φ)) - 2*Math.sqrt(n)/(1+n)*Math.atanh(2*Math.sqrt(n)/(1+n)*Math.sin(φ)));
+      const ξ′ = Math.atan(t / Math.cos(λ));
+      const η′ = Math.atanh(Math.sin(λ) / Math.sqrt(1 + t**2));
+
+      let E = 500000 + k0*A*(η′ + β[1]*Math.cos(2*1*ξ′)*Math.sinh(2*1*η′));
+      let N = k0*A*(ξ′ + β[1]*Math.sin(2*1*ξ′)*Math.cosh(2*1*η′));
+      if (lat < 0) N += 10000000;
+
+      return {E: Math.round(E), N: Math.round(N)};
+    }
+
+    // สร้างแผนที่
+    const map = L.map('map', { center: [19.953, 99.769], zoom: 13 });
+
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
     const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      maxZoom: 20,
       attribution: '© Google Satellite'
     });
 
@@ -112,67 +122,69 @@
       "🗺️ OpenStreetMap": osm,
       "🛰️ Google Satellite": googleSat
     };
-
     const overlayLayers = {};
+    const layerMeta = {};
+
+    // สีหมู่บ้าน
     const colors = {
-      "หมู่ที่ 1": "#f94144", "หมู่ที่ 2": "#f3722c", "หมู่ที่ 3": "#f9c74f",
-      "หมู่ที่ 4": "#90be6d", "หมู่ที่ 5": "#43aa8b", "หมู่ที่ 6": "#577590",
-      "หมู่ที่ 7": "#277da1", "หมู่ที่ 8": "#4d908e", "หมู่ที่ 9": "#f9844a",
-      "หมู่ที่ 10": "#ff6f61"
+      "หมู่ที่ 1": "#f94144","หมู่ที่ 2": "#f3722c","หมู่ที่ 3": "#f9c74f",
+      "หมู่ที่ 4": "#90be6d","หมู่ที่ 5": "#43aa8b","หมู่ที่ 6": "#577590",
+      "หมู่ที่ 7": "#277da1","หมู่ที่ 8": "#4d908e","หมู่ที่ 9": "#f9844a","หมู่ที่ 10": "#ff6f61"
     };
 
-    // โหลด layers.json
+    // โหลด KML ทั้งหมด
     fetch('layers/layers.json')
       .then(res => res.json())
       .then(files => {
         files.forEach(file => {
-          const path = 'layers/' + file;
-          const layer = omnivore.kml(path)
+          const layer = omnivore.kml('layers/' + file)
             .on('ready', function() {
               this.eachLayer(l => {
-                const name = file.replace('.kml','');
-                if (l.feature && l.feature.properties && l.feature.properties.name) {
-                  const fname = l.feature.properties.name;
-                  // สีหมู่บ้านตามชื่อ
-                  for (const [k, c] of Object.entries(colors)) {
-                    if (fname.includes(k)) {
-                      l.setStyle({ color: c, fillColor: c, fillOpacity: 0.4 });
-                    }
-                  }
-                  l.bindPopup(`<b>${fname}</b><br>${name}`);
+                const name = l.feature?.properties?.name || file.replace('.kml','');
+                l.bindPopup(`<b>${name}</b>`);
+                if (l.feature?.geometry?.type) layerMeta[file] = l.feature.geometry.type;
+                // สีหมู่บ้าน
+                for (const [k, c] of Object.entries(colors)) {
+                  if (name.includes(k)) l.setStyle({ color: c, fillColor: c, fillOpacity: 0.4 });
                 }
               });
-            })
-            .addTo(map);
-
+            });
           overlayLayers[file] = layer;
         });
 
-        // สร้าง control ชั้นข้อมูล
-        const layerControl = L.control.layers(baseLayers, overlayLayers, {collapsed:false}).addTo(map);
+        const layerCtrl = L.control.layers(baseLayers, null, {collapsed:false}).addTo(map);
 
-        // เพิ่ม slider ควบคุมแต่ละชั้น
-        const container = layerControl.getContainer();
-        const list = container.querySelector('.leaflet-control-layers-overlays');
+        // เพิ่มรายการชั้นข้อมูล
+        const overlayContainer = layerCtrl.getContainer().querySelector('.leaflet-control-layers-overlays');
         Object.keys(overlayLayers).forEach(file => {
-          const label = Array.from(list.querySelectorAll('label')).find(l => l.textContent.includes(file));
-          if (label) {
-            const div = document.createElement('div');
-            div.className = 'slider-group';
+          const item = L.DomUtil.create('label', '', overlayContainer);
+          const input = L.DomUtil.create('input', '', item);
+          input.type = 'checkbox';
+          input.onchange = () => {
+            if (input.checked) map.addLayer(overlayLayers[file]);
+            else map.removeLayer(overlayLayers[file]);
+          };
+          const name = document.createTextNode(' ' + file.replace('.kml',''));
+          item.appendChild(name);
+
+          const type = layerMeta[file] || '';
+          const div = document.createElement('div');
+          div.className = 'slider-group';
+
+          if (type.includes('Point')) {
+            div.innerHTML = `จุด: <input type="range" min="4" max="20" step="1" value="8" data-type="radius" data-file="${file}">`;
+          } else {
             div.innerHTML = `
-              <div>ทึบ: <input type="range" min="0" max="1" step="0.1" value="0.8" data-type="opacity" data-file="${file}"></div>
-              <div>หนา: <input type="range" min="1" max="10" step="1" value="2" data-type="weight" data-file="${file}"></div>
-              <div>จุด: <input type="range" min="4" max="20" step="1" value="8" data-type="radius" data-file="${file}"></div>
+              ทึบ: <input type="range" min="0" max="1" step="0.1" value="0.8" data-type="opacity" data-file="${file}">
+              หนา: <input type="range" min="1" max="10" step="1" value="2" data-type="weight" data-file="${file}">
             `;
-            label.appendChild(div);
           }
+          item.appendChild(div);
         });
 
         // slider event
-        container.addEventListener('input', e => {
-          const type = e.target.dataset.type;
-          const file = e.target.dataset.file;
-          const val = parseFloat(e.target.value);
+        overlayContainer.addEventListener('input', e => {
+          const type = e.target.dataset.type, file = e.target.dataset.file, val = parseFloat(e.target.value);
           const layer = overlayLayers[file];
           if (!layer) return;
           layer.eachLayer(l => {
@@ -182,9 +194,7 @@
               if (type === 'weight') st.weight = val;
               l.setStyle(st);
             }
-            if (l.setRadius && type === 'radius') {
-              l.setRadius(val);
-            }
+            if (l.setRadius && type === 'radius') l.setRadius(val);
           });
         });
       });
@@ -194,27 +204,21 @@
     const locateBtn = L.control({ position: 'topleft' });
     locateBtn.onAdd = function() {
       const div = L.DomUtil.create('div', 'leaflet-control custom-control');
-      div.innerHTML = '<span class="material-symbols-outlined">my_location</span> ตำแหน่งฉัน';
+      div.innerText = '📍 ตำแหน่งฉัน';
       div.onclick = () => {
-        if (userMarker) {
-          map.removeLayer(userMarker);
-          userMarker = null;
-        } else {
-          map.locate({setView:true, maxZoom:17});
-        }
+        if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+        else { map.locate({setView:true, maxZoom:17}); }
       };
       return div;
     };
     locateBtn.addTo(map);
-    map.on('locationfound', e => {
-      userMarker = L.marker(e.latlng).addTo(map).bindPopup("คุณอยู่ที่นี่").openPopup();
-    });
+    map.on('locationfound', e => { userMarker = L.marker(e.latlng).addTo(map).bindPopup("คุณอยู่ที่นี่").openPopup(); });
 
     // ปุ่มรีเซ็ต
     const resetBtn = L.control({ position: 'topleft' });
     resetBtn.onAdd = function() {
       const div = L.DomUtil.create('div', 'leaflet-control custom-control');
-      div.innerHTML = '<span class="material-symbols-outlined">refresh</span> รีเซ็ตตำบลแม่ยาว';
+      div.innerText = '🔄 รีเซ็ตตำบลแม่ยาว';
       div.onclick = () => map.setView([19.953, 99.769], 13);
       return div;
     };
@@ -232,11 +236,17 @@
     // มาตราส่วน
     function updateScale() {
       const metersPerPixel = 40075016.686 * Math.abs(Math.cos(map.getCenter().lat * Math.PI / 180)) / Math.pow(2, map.getZoom() + 8);
-      const scale = Math.round(metersPerPixel * 100); // 100px
+      const scale = Math.round(metersPerPixel * 100);
       document.getElementById('scaleDisplay').innerText = `มาตราส่วน 1:${scale}`;
     }
     map.on('zoomend moveend', updateScale);
     updateScale();
+
+    // แสดงพิกัด UTM
+    map.on('mousemove', e => {
+      const utm = latLngToUTM(e.latlng.lat, e.latlng.lng);
+      document.getElementById('utmDisplay').innerText = `E: ${utm.E}, N: ${utm.N}`;
+    });
   </script>
 </body>
 </html>
