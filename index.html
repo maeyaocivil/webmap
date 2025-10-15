@@ -88,4 +88,163 @@
 
   /* ชั้นข้อมูล */
   .layer-control {
-    position: absolute
+    position: absolute;
+    top: 80px;
+    right: 10px;
+    z-index: 1000;
+    background: white;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
+    font-size: 14px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  /* พิกัด UTM */
+  #utm-coord {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    background: rgba(255,255,255,0.9);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    z-index: 1000;
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+<div class="logo-container">
+  <img src="https://www.maeyao.go.th/assets/images/logo/180pix_logo-MaeYao.png" alt="โลโก้เทศบาลแม่ยาว">
+</div>
+
+<div class="custom-controls">
+  <button id="reset-btn" class="custom-btn">🔄 รีเซ็ตตำบลแม่ยาว</button>
+  <button id="locate-btn" class="custom-btn">📍 ตำแหน่งฉัน</button>
+</div>
+
+<div class="compass">
+  <div class="compass-arrow"></div>
+</div>
+
+<div class="layer-control" id="layer-control">
+  <b>📚 ชั้นข้อมูล</b><br>
+  <div id="layer-list"></div>
+</div>
+
+<div id="utm-coord">E: - , N: -</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/togeojson"></script>
+<script>
+// เริ่มแผนที่
+const map = L.map('map', { center: [19.95, 99.8], zoom: 12 });
+
+// แผนที่ฐาน
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+const sat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 });
+L.control.layers({"🗺️ OpenStreetMap": osm, "🌍 Google Satellite": sat}).addTo(map);
+
+// โหลด layers.json
+fetch('layers/layers.json')
+  .then(res => res.json())
+  .then(files => {
+    const layerList = document.getElementById('layer-list');
+    files.forEach(filename => {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = filename;
+      checkbox.style.marginRight = '5px';
+
+      const label = document.createElement('label');
+      label.innerText = filename.replace('.kml', '');
+      label.htmlFor = filename;
+
+      const container = document.createElement('div');
+      container.appendChild(checkbox);
+      container.appendChild(label);
+      layerList.appendChild(container);
+
+      let layerGroup;
+
+      checkbox.addEventListener('change', async () => {
+        if (checkbox.checked) {
+          const response = await fetch('layers/' + filename);
+          const text = await response.text();
+          const parser = new DOMParser();
+          const kml = parser.parseFromString(text, 'text/xml');
+          const geojson = toGeoJSON.kml(kml);
+
+          layerGroup = L.geoJSON(geojson, {
+            onEachFeature: (feature, layer) => {
+              if (feature.properties.name) layer.bindPopup(feature.properties.name);
+            },
+            pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+              radius: 6, color: 'blue', fillOpacity: 0.7
+            }),
+            style: f => ({
+              color: 'blue',
+              fillColor: 'blue',
+              fillOpacity: 0.3,
+              weight: 2
+            })
+          }).addTo(map);
+        } else {
+          if (layerGroup) map.removeLayer(layerGroup);
+        }
+      });
+    });
+  });
+
+// พิกัด UTM
+function toUTM(lat, lon) {
+  const zone = Math.floor((lon + 180) / 6) + 1;
+  const a = 6378137.0, f = 1/298.257223563, k0 = 0.9996;
+  const e = Math.sqrt(f*(2-f));
+  const λ0 = ((zone-1)*6 - 180 + 3) * Math.PI/180;
+  const φ = lat*Math.PI/180, λ = lon*Math.PI/180;
+  const N = a / Math.sqrt(1 - e*e*Math.sin(φ)*Math.sin(φ));
+  const T = Math.tan(φ)*Math.tan(φ);
+  const C = (e*e/(1-e*e))*Math.cos(φ)*Math.cos(φ);
+  const A = Math.cos(φ)*(λ - λ0);
+  const M = a*((1 - e*e/4 - 3*e**4/64 - 5*e**6/256)*φ
+    - (3*e*e/8 + 3*e**4/32 + 45*e**6/1024)*Math.sin(2*φ)
+    + (15*e**4/256 + 45*e**6/1024)*Math.sin(4*φ)
+    - (35*e**6/3072)*Math.sin(6*φ));
+  const easting = 500000 + k0*N*(A + (1-T+C)*A**3/6 + (5-18*T+T**2+72*C-58*(e**2/(1-e**2)))*A**5/120);
+  const northing = k0*(M + N*Math.tan(φ)*(A**2/2 + (5-T+9*C+4*C**2)*A**4/24 + (61-58*T+T**2+600*C-330*(e**2/(1-e**2)))*A**6/720));
+  return {E: easting.toFixed(2), N: northing.toFixed(2)};
+}
+
+map.on('mousemove', e => {
+  const utm = toUTM(e.latlng.lat, e.latlng.lng);
+  document.getElementById('utm-coord').innerText = `E: ${utm.E}, N: ${utm.N}`;
+});
+
+// ปุ่มตำแหน่งฉัน
+let userMarker = null;
+let locateActive = false;
+document.getElementById('locate-btn').addEventListener('click', () => {
+  if (!locateActive) {
+    map.locate({setView: true, maxZoom: 16});
+    map.on('locationfound', e => {
+      if (!userMarker) userMarker = L.marker(e.latlng).addTo(map).bindPopup("ตำแหน่งของคุณ");
+      userMarker.openPopup();
+    });
+    locateActive = true;
+  } else {
+    if (userMarker) map.removeLayer(userMarker);
+    locateActive = false;
+  }
+});
+
+// ปุ่มรีเซ็ต
+document.getElementById('reset-btn').addEventListener('click', () => {
+  map.setView([19.95, 99.8], 12);
+});
+</script>
+</body>
+</html>
