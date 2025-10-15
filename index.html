@@ -10,60 +10,62 @@
 <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
 <style>
-  html, body { height: 100%; margin: 0; font-family: "Sarabun", sans-serif; background: #eef3f8; }
-  #map { height: 100%; width: 100%; }
+html, body { height: 100%; margin: 0; font-family: "Sarabun", sans-serif; background: #eef3f8; }
+#map { height: 100%; width: 100%; }
 
-  #toggleBtn {
-    position: absolute; top: 15px; right: 15px;
-    background: white; border: 1px solid #ccc;
-    padding: 6px 12px; border-radius: 8px;
-    z-index: 1001; cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  }
+/* ปุ่ม */
+.map-btn {
+  position: absolute; left: 15px;
+  background: white; padding: 6px 10px;
+  border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  border: 1px solid #ccc; cursor: pointer;
+  z-index: 1001; font-size: 14px;
+}
+#resetBtn { top: 15px; }
+#locateBtn { top: 60px; }
 
-  .layer-control {
-    position: absolute; top: 60px; right: 15px;
-    background: white; padding: 10px; max-height: 85vh;
-    overflow-y: auto; border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-    width: 280px; display: none; z-index: 1000;
-  }
+/* ปุ่มชั้นข้อมูล */
+#toggleBtn {
+  position: absolute; top: 15px; right: 15px;
+  background: white; border: 1px solid #ccc;
+  padding: 6px 12px; border-radius: 8px;
+  z-index: 1001; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
 
-  .layer-item { margin-bottom: 10px; }
-  .slider-container { margin: 4px 0 4px 20px; font-size: 0.85em; color: #333; display: none; }
-  .slider-container input[type="range"] { width: 85%; }
+/* กล่องควบคุม */
+.layer-control {
+  position: absolute; top: 60px; right: 15px;
+  background: white; padding: 10px;
+  max-height: 85vh; overflow-y: auto;
+  border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+  width: 280px; display: none; z-index: 1000;
+}
 
-  .basemap-btn {
-    display: inline-block; background: #f8f9fa;
-    border: 1px solid #ccc; padding: 4px 8px; margin: 2px;
-    border-radius: 5px; cursor: pointer;
-  }
-  .basemap-btn.active { background: #cce5ff; border-color: #007bff; }
+.layer-item { margin-bottom: 10px; }
+.slider-container { margin: 4px 0 4px 20px; font-size: 0.85em; display: none; }
+.slider-container input[type="range"] { width: 85%; }
 
-  .map-btn {
-    position: absolute; left: 15px;
-    background: white; padding: 6px 10px;
-    border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    border: 1px solid #ccc; cursor: pointer;
-    z-index: 1001; font-size: 14px;
-  }
-  #resetBtn { top: 15px; }
-  #locateBtn { top: 60px; }
+.basemap-btn {
+  display: inline-block; background: #f8f9fa;
+  border: 1px solid #ccc; padding: 4px 8px; margin: 2px;
+  border-radius: 5px; cursor: pointer;
+}
+.basemap-btn.active { background: #cce5ff; border-color: #007bff; }
 
-  .leaflet-control-zoom { margin-top: 110px !important; }
+.leaflet-control-zoom { margin-top: 110px !important; }
 </style>
 </head>
 
 <body>
 <div id="map"></div>
-<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
 <div id="resetBtn" class="map-btn">📍 รีเซ็ต ตำบลแม่ยาว</div>
 <div id="locateBtn" class="map-btn">📡 ตำแหน่งฉัน</div>
+<div id="toggleBtn">🧭 ชั้นข้อมูล</div>
 
 <div class="layer-control" id="layerControl">
-  <h3 style="margin-top:0;">🗺️ แผนที่ฐาน</h3>
-  <div id="basemaps"></div>
-  <hr>
+  <h3>🗺️ แผนที่ฐาน</h3>
+  <div id="basemaps"></div><hr>
   <h3>📚 ชั้นข้อมูล</h3>
   <div id="layerList"></div>
 </div>
@@ -71,7 +73,7 @@
 <script>
 const map = L.map('map').setView([19.95, 99.80], 12);
 
-// ฐานแผนที่
+// 🗺️ แผนที่ฐาน
 const baseLayers = {
   "OpenStreetMap": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }),
   "Google Satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=s&hl=th&x={x}&y={y}&z={z}', { maxZoom: 20 })
@@ -93,25 +95,38 @@ Object.keys(baseLayers).forEach(key => {
   basemapsDiv.appendChild(btn);
 });
 
+// ปุ่มเปิด/ปิดชั้นข้อมูล
 document.getElementById('toggleBtn').onclick = () => {
   const ctrl = document.getElementById('layerControl');
   ctrl.style.display = ctrl.style.display === 'none' ? 'block' : 'none';
 };
 
-// สีหมู่บ้านอิงชื่อ
-function colorByVillage(name) {
-  const colors = {
-    "หมู่ที่ 1": "#ff6666", "หมู่ที่ 2": "#66b3ff", "หมู่ที่ 3": "#99ff99",
-    "หมู่ที่ 4": "#ffcc66", "หมู่ที่ 5": "#cc99ff", "หมู่ที่ 6": "#ff99cc",
-    "หมู่ที่ 7": "#99ffff", "หมู่ที่ 8": "#ff9966", "หมู่ที่ 9": "#cccccc"
-  };
-  for (let key in colors) if (name.includes(key)) return colors[key];
-  return '#'+Math.floor(Math.random()*16777215).toString(16);
+// 🎨 สีคงที่ต่อไฟล์
+const fixedColors = {};
+function getFixedColor(name) {
+  if (!fixedColors[name]) {
+    const hash = Array.from(name).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const hue = hash % 360;
+    fixedColors[name] = `hsl(${hue},70%,60%)`;
+  }
+  return fixedColors[name];
 }
 
-fetch('layers/layers.json')
-.then(res => res.json())
-.then(files => {
+// 🎨 สีหมู่บ้านคงที่ 20 หมู่
+const villageColors = {
+  "หมู่ที่ 1": "#ff0000", "หมู่ที่ 2": "#ff6600", "หมู่ที่ 3": "#ffcc00", "หมู่ที่ 4": "#99cc00",
+  "หมู่ที่ 5": "#00cc00", "หมู่ที่ 6": "#00cccc", "หมู่ที่ 7": "#0099ff", "หมู่ที่ 8": "#0033cc",
+  "หมู่ที่ 9": "#6600cc", "หมู่ที่ 10": "#cc00cc", "หมู่ที่ 11": "#cc0066", "หมู่ที่ 12": "#ff3366",
+  "หมู่ที่ 13": "#cc9900", "หมู่ที่ 14": "#669900", "หมู่ที่ 15": "#339966", "หมู่ที่ 16": "#006699",
+  "หมู่ที่ 17": "#663399", "หมู่ที่ 18": "#993366", "หมู่ที่ 19": "#999999", "หมู่ที่ 20": "#333333"
+};
+function colorByVillage(name) {
+  for (let k in villageColors) if (name.includes(k)) return villageColors[k];
+  return getFixedColor(name);
+}
+
+// 📚 โหลดชั้นข้อมูล
+fetch('layers/layers.json').then(r => r.json()).then(files => {
   const list = document.getElementById('layerList');
   files.forEach(fileName => {
     const name = fileName.replace('.kml', '');
@@ -120,19 +135,12 @@ fetch('layers/layers.json')
     div.innerHTML = `<input type="checkbox" id="${name}"> <label for="${name}">${name}</label>`;
     list.appendChild(div);
 
-    // slider container
     const sliderDiv = document.createElement('div');
     sliderDiv.className = 'slider-container';
     sliderDiv.innerHTML = `
-      <div class="opacity-slider">
-        ความทึบ <input type="range" min="0" max="1" step="0.1" value="0.5">
-      </div>
-      <div class="weight-slider">
-        ความหนาเส้น <input type="range" min="1" max="10" step="1" value="2">
-      </div>
-      <div class="point-slider">
-        ขนาดจุด <input type="range" min="3" max="20" step="1" value="7">
-      </div>`;
+      <div class="opacity-slider">ความทึบ <input type="range" min="0" max="1" step="0.1" value="0.5"></div>
+      <div class="weight-slider">ความหนาเส้น <input type="range" min="1" max="10" step="1" value="2"></div>
+      <div class="point-slider">ขนาดจุด <input type="range" min="3" max="20" step="1" value="7"></div>`;
     list.appendChild(sliderDiv);
 
     const layerGroup = L.layerGroup();
@@ -147,24 +155,24 @@ fetch('layers/layers.json')
       layerGroup.clearLayers();
       geojsonFeatures.forEach(f => {
         const type = f.geometry.type;
-        const color = colorByVillage(f.properties.name || name);
+        const color = (fileName.includes("แนวเขตหมู่บ้าน") ? colorByVillage(f.properties.name || '') : getFixedColor(fileName));
         if (type === "Point") {
           const marker = L.circleMarker([f.geometry.coordinates[1], f.geometry.coordinates[0]], {
-            radius: parseFloat(pointSlider.value),
+            radius: +pointSlider.value,
             fillColor: color,
             color: "#333",
             weight: 1,
-            fillOpacity: parseFloat(opacitySlider.value)
-          }).bindPopup(name);
+            fillOpacity: +opacitySlider.value
+          }).bindPopup(f.properties.name || name);
           layerGroup.addLayer(marker);
         } else {
-          const style = {
-            color: color,
-            weight: parseFloat(weightSlider.value),
-            fillColor: color,
-            fillOpacity: parseFloat(opacitySlider.value)
-          };
-          const layer = L.geoJSON(f, { style }).bindPopup(name);
+          const layer = L.geoJSON(f, {
+            style: {
+              color, fillColor: color,
+              weight: +weightSlider.value,
+              fillOpacity: +opacitySlider.value
+            }
+          }).bindPopup(f.properties.name || name);
           layerGroup.addLayer(layer);
         }
       });
@@ -175,48 +183,41 @@ fetch('layers/layers.json')
         geojsonFeatures = this.toGeoJSON().features;
         applyStyle();
         layerGroup.addTo(map);
-
-        // ตรวจชนิด
         const hasPoint = geojsonFeatures.some(f => f.geometry.type === 'Point');
-        const hasLineOrPoly = geojsonFeatures.some(f => f.geometry.type !== 'Point');
+        const hasPoly = geojsonFeatures.some(f => f.geometry.type !== 'Point');
         sliderDiv.querySelector('.point-slider').style.display = hasPoint ? 'block' : 'none';
-        sliderDiv.querySelector('.opacity-slider').style.display = hasLineOrPoly ? 'block' : 'block';
-        sliderDiv.querySelector('.weight-slider').style.display = hasLineOrPoly ? 'block' : 'none';
+        sliderDiv.querySelector('.opacity-slider').style.display = hasPoly ? 'block' : 'block';
+        sliderDiv.querySelector('.weight-slider').style.display = hasPoly ? 'block' : 'none';
         sliderDiv.style.display = 'block';
       });
     }
 
-    opacitySlider.addEventListener('input', applyStyle);
-    weightSlider.addEventListener('input', applyStyle);
-    pointSlider.addEventListener('input', applyStyle);
-
-    checkbox.addEventListener('change', e => {
-      if (e.target.checked) {
-        addLayer();
-      } else {
-        map.removeLayer(layerGroup);
-        sliderDiv.style.display = 'none';
-      }
-    });
+    checkbox.onchange = e => {
+      if (e.target.checked) addLayer();
+      else { map.removeLayer(layerGroup); sliderDiv.style.display = 'none'; }
+    };
+    [opacitySlider, weightSlider, pointSlider].forEach(sl => sl.oninput = applyStyle);
   });
 });
 
-// 📍 ปุ่มรีเซ็ต
+// 📍 รีเซ็ต
 document.getElementById('resetBtn').onclick = () => map.setView([19.95, 99.80], 12);
 
 // 📡 ตำแหน่งฉัน
 let locateActive = false, locateMarker;
-document.getElementById('locateBtn').onclick = () => {
+const locateBtn = document.getElementById('locateBtn');
+locateBtn.onclick = () => {
   locateActive = !locateActive;
   if (locateActive) {
-    map.locate({ setView: true, watch: true, maxZoom: 16 });
-    map.on('locationfound', e => {
-      if (locateMarker) locateMarker.setLatLng(e.latlng);
-      else locateMarker = L.marker(e.latlng).addTo(map).bindPopup("ตำแหน่งของคุณ").openPopup();
+    locateBtn.style.background = '#cce5ff';
+    map.locate({ setView: true, maxZoom: 16 });
+    map.once('locationfound', e => {
+      if (locateMarker) locateMarker.remove();
+      locateMarker = L.marker(e.latlng).addTo(map).bindPopup("ตำแหน่งของคุณ").openPopup();
     });
   } else {
-    if (locateMarker) map.removeLayer(locateMarker);
-    map.stopLocate();
+    locateBtn.style.background = 'white';
+    if (locateMarker) { map.removeLayer(locateMarker); locateMarker = null; }
   }
 };
 </script>
