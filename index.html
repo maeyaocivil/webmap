@@ -23,8 +23,9 @@
     padding: 3px;
     box-shadow: 0 0 4px rgba(0,0,0,0.3);
     cursor: pointer;
+    z-index: 9999;
   }
-  .logo img { width: 48px; height: 48px; }
+  .logo img { width: 50px; height: 50px; }
 
   /* ปุ่มมุมซ้ายล่าง */
   .bottom-left-controls {
@@ -32,8 +33,9 @@
     bottom: 15px;
     left: 10px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
+    z-index: 9999; /* สำคัญสุด */
   }
   .map-btn {
     background: white;
@@ -64,6 +66,7 @@
     background: white;
     border-radius: 50%;
     box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    z-index: 9999;
   }
   .compass::before {
     content: "";
@@ -87,21 +90,6 @@
     transform: translateX(-50%);
     font-size: 14px;
   }
-
-  .opacity-slider {
-    width: 90%;
-    margin-top: 3px;
-  }
-
-  .layer-control {
-    background: white;
-    border-radius: 8px;
-    padding: 8px;
-    max-height: 400px;
-    overflow-y: auto;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-    font-size: 14px;
-  }
 </style>
 </head>
 <body>
@@ -112,7 +100,7 @@
 
 <!-- ปุ่มมุมซ้ายล่าง -->
 <div class="bottom-left-controls">
-  <button id="resetBtn" class="map-btn">รีเซ็ต ตำบลแม่ยาว</button>
+  <button id="resetBtn" class="map-btn">รีเซตมุมมอง</button>
   <button id="locateBtn" class="map-btn">ตำแหน่งฉัน</button>
   <div id="coord-display">E: -, N: -</div>
 </div>
@@ -123,8 +111,7 @@
 
   // Base Maps
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap'
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
   const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
@@ -132,14 +119,12 @@
   });
 
   const baseMaps = { "🗺️ OpenStreetMap": osm, "🌍 Google Satellite": googleSat };
+  const layerControl = L.control.layers(baseMaps, null, { position: "topright" }).addTo(map);
 
-  // กล่องชั้นข้อมูล
-  const layerControl = L.control.layers(baseMaps, null, { collapsed: false }).addTo(map);
-
-  // เพิ่มปุ่ม + -
+  // ปุ่ม + -
   L.control.zoom({ position: 'topleft' }).addTo(map);
 
-  // โลโก้เทศบาล
+  // โลโก้เทศบาล (เหนือปุ่ม + -)
   const logoControl = L.control({ position: 'topleft' });
   logoControl.onAdd = function() {
     const div = L.DomUtil.create('div', 'logo');
@@ -148,61 +133,40 @@
   };
   logoControl.addTo(map);
 
-  // มาตราส่วน (มีเส้นและเลข)
-  L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+  // มาตราส่วนมุมขวาล่าง
+  L.control.scale({ position: 'bottomright', metric: true, imperial: false }).addTo(map);
 
-  // โหลดข้อมูล KML ทั้งหมด
+  // สุ่มสีชั้นข้อมูล
+  function randomColor() {
+    const colors = ["#e6194B","#3cb44b","#ffe119","#4363d8","#f58231","#911eb4",
+                    "#46f0f0","#f032e6","#bcf60c","#fabebe","#008080","#e6beff",
+                    "#9A6324","#fffac8","#800000","#aaffc3","#808000","#ffd8b1"];
+    return colors[Math.floor(Math.random()*colors.length)];
+  }
+
+  // โหลดข้อมูล KML
   fetch("layers/layers.json")
     .then(r => r.json())
     .then(files => {
       files.forEach(file => {
+        const color = randomColor();
         const layer = omnivore.kml("layers/" + file)
           .on("ready", function() {
-            const name = file.replace(".kml", "");
-            const lyr = this;
-            let geomType = null;
-            lyr.eachLayer(l => {
-              if (l.feature && l.feature.geometry) geomType = l.feature.geometry.type;
+            this.eachLayer(l => {
+              if (l.setStyle) l.setStyle({ color, weight: 3, fillOpacity: 0.6 });
             });
-
-            const div = L.DomUtil.create('div', 'layer-control');
-            div.innerHTML = `<b>${name}</b><br>`;
-            if (geomType && geomType.includes("Point")) {
-              div.innerHTML += `จุด: <input type="range" min="2" max="15" value="6" step="1" class="opacity-slider" id="size-${name}"><br>`;
-            } else {
-              div.innerHTML += `ทึบ: <input type="range" min="0" max="1" step="0.1" value="0.8" class="opacity-slider" id="opacity-${name}"><br>`;
-              div.innerHTML += `หนา: <input type="range" min="1" max="8" step="1" value="3" class="opacity-slider" id="weight-${name}"><br>`;
-            }
-
-            div.querySelectorAll('input').forEach(inp => {
-              inp.addEventListener('input', () => {
-                lyr.eachLayer(l => {
-                  if (l.setStyle) {
-                    const op = div.querySelector(`#opacity-${name}`)?.value || 0.8;
-                    const wt = div.querySelector(`#weight-${name}`)?.value || 3;
-                    l.setStyle({ opacity: op, fillOpacity: op, weight: wt });
-                  } else if (l.setRadius) {
-                    const sz = div.querySelector(`#size-${name}`)?.value || 6;
-                    l.setRadius(parseFloat(sz));
-                  }
-                });
-              });
-            });
-
-            layerControl.addOverlay(lyr, div);
+            const name = file.replace(".kml","");
+            layerControl.addOverlay(this, `<span style="color:${color};font-weight:bold;">⬤</span> ${name}`);
           })
           .addTo(map);
       });
     });
 
-  // ปุ่มรีเซ็ต
-  document.getElementById("resetBtn").onclick = () => {
-    map.setView([19.935, 99.791], 13);
-  };
+  // ปุ่มรีเซตมุมมอง
+  document.getElementById("resetBtn").onclick = () => map.setView([19.935, 99.791], 13);
 
   // ปุ่มตำแหน่งฉัน
-  let userMarker = null;
-  let locateOn = false;
+  let userMarker = null, locateOn = false;
   document.getElementById("locateBtn").onclick = () => {
     if (!locateOn) {
       map.locate({ setView: true, maxZoom: 16 });
@@ -228,10 +192,7 @@
 
   // แปลง LatLong → UTM Zone 47N
   function LLtoUTM(lat, lon) {
-    const zone = 47;
-    const a = 6378137.0;
-    const f = 1 / 298.257223563;
-    const k0 = 0.9996;
+    const zone = 47, a = 6378137.0, f = 1 / 298.257223563, k0 = 0.9996;
     const lonOrigin = (zone - 1) * 6 - 180 + 3;
     const e = Math.sqrt(f * (2 - f));
     const N = a / Math.sqrt(1 - e * e * Math.sin(lat * Math.PI/180)**2);
@@ -251,4 +212,4 @@
   }
 </script>
 </body>
-</html
+</html>
