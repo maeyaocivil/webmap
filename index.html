@@ -1,153 +1,257 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8">
-<title>OneMap - เทศบาลตำบลแม่ยาว</title>
+<meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OneMap - เทศบาลตำบลแม่ยาว</title>
 <link rel="icon" href="https://www.maeyao.go.th/assets/images/logo/180pix_logo-MaeYao.png">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/togeojson"></script>
+
+<!-- KML -->
+<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+
+<!-- Scale / Compass -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-compass/dist/leaflet-compass.css" />
+<script src="https://unpkg.com/leaflet-compass/dist/leaflet-compass.min.js"></script>
+
 <style>
-  html, body { height: 100%; margin: 0; font-family: "TH Sarabun New", sans-serif; }
-  #map { width: 100%; height: 100%; }
+  html, body, #map { height: 100%; margin: 0; }
 
-  /* โลโก้เทศบาล */
-  .logo {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: white;
-    padding: 4px;
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-    z-index: 1000;
-  }
-  .logo img { width: 55px; height: 55px; }
-
-  /* ปุ่ม zoom เดิม */
-  .leaflet-control-zoom {
-    margin-top: 70px !important; /* เลื่อนลงหลังโลโก้ */
-  }
-
-  /* มุมซ้ายล่าง */
-  .bottom-left {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    z-index: 1000;
+  .leaflet-top.leaflet-left {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 6px;
+    margin-left: 6px;
+  }
+
+  .logo {
+    background: white;
+    border-radius: 8px;
+    padding: 4px;
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+  }
+
+  .logo img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .bottom-left-controls {
+    position: absolute;
+    bottom: 15px;
+    left: 10px;
+    display: flex;
+    gap: 10px;
     align-items: center;
   }
-  .custom-btn {
+
+  .map-btn {
     background: white;
-    border: 1px solid #bbb;
-    padding: 6px 10px;
+    border: 1px solid #999;
     border-radius: 6px;
+    padding: 5px 10px;
     cursor: pointer;
-    font-size: 15px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  }
-  .custom-btn:hover {
-    background: #f1f1f1;
-  }
-  #utm {
-    background: rgba(255,255,255,0.95);
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: bold;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    font-size: 13px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   }
 
-  /* เข็มทิศ */
+  .map-btn:hover {
+    background: #f2f2f2;
+  }
+
+  #coord-display {
+    background: white;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    border: 1px solid #999;
+  }
+
+  .opacity-slider {
+    width: 90%;
+    margin-top: 3px;
+  }
+
   .compass {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 55px;
-    height: 55px;
+    width: 50px;
+    height: 50px;
     background: white;
     border-radius: 50%;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    font-weight: bold;
-    color: #d32f2f;
-  }
-  .compass::after {
-    content: "N";
-    position: absolute;
-    top: 6px;
-    font-size: 12px;
-  }
-  .compass-arrow {
-    width: 0; height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-bottom: 15px solid #d32f2f;
+    position: relative;
+    box-shadow: 0 0 6px rgba(0,0,0,0.3);
   }
 
-  /* ชั้นข้อมูล */
-  .layer-btn {
+  .compass::after {
+    content: "N";
+    color: red;
+    font-weight: bold;
     position: absolute;
-    top: 75px;
-    right: 10px;
-    background: white;
-    border: 1px solid #bbb;
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 15px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    z-index: 1000;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
   }
-  .layer-panel {
-    position: absolute;
-    top: 120px;
-    right: 10px;
+
+  .layer-control {
     background: white;
     border-radius: 8px;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.3);
     padding: 8px;
-    max-height: 80vh;
+    max-height: 400px;
     overflow-y: auto;
-    z-index: 999;
-    display: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   }
-  .slider {
-    width: 120px;
-  }
-  .slider-label {
-    font-size: 13px;
-    color: #333;
-  }
+
 </style>
 </head>
 <body>
-
 <div id="map"></div>
 
-<!-- โลโก้ -->
-<div class="logo">
-  <img src="https://www.maeyao.go.th/assets/images/logo/180pix_logo-MaeYao.png" alt="logo">
+<div class="bottom-left-controls">
+  <button id="resetBtn" class="map-btn">รีเซ็ต ตำบลแม่ยาว</button>
+  <button id="locateBtn" class="map-btn">ตำแหน่งฉัน</button>
+  <div id="coord-display">E: -, N: -</div>
 </div>
 
-<!-- เข็มทิศ -->
-<div class="compass"><div class="compass-arrow"></div></div>
+<script>
+  // 🗺️ สร้างแผนที่
+  const map = L.map("map").setView([19.935, 99.791], 13);
 
-<!-- ปุ่มเปิดปิดชั้นข้อมูล -->
-<button class="layer-btn" id="toggleLayers">📚 ชั้นข้อมูล</button>
+  // 🔹 Base Maps
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
 
-<!-- กล่องชั้นข้อมูล -->
-<div class="layer-panel" id="layerPanel">
-  <b>📚 ชั้นข้อมูล</b><br>
-  <div id="layerList"></div>
-</div>
+  const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    attribution: '&copy; Google Satellite'
+  });
 
-<!-- มุมซ้ายล่าง -->
-<div class="bottom-left">
-  <button id="reset" class="custom-btn">🔄
+  const baseMaps = { "🗺️ OpenStreetMap": osm, "🌍 Google Satellite": googleSat };
+
+  // 🔹 กล่องชั้นข้อมูล
+  const layerControl = L.control.layers(baseMaps, null, { collapsed: false }).addTo(map);
+
+  // 🔹 โลโก้เทศบาล
+  const logoControl = L.control({ position: 'topleft' });
+  logoControl.onAdd = function() {
+    const div = L.DomUtil.create('div', 'logo');
+    div.innerHTML = '<a href="https://www.maeyao.go.th/" target="_blank"><img src="https://www.maeyao.go.th/assets/images/logo/180pix_logo-MaeYao.png"></a>';
+    return div;
+  };
+  logoControl.addTo(map);
+
+  // 🔹 มาตราส่วน (มีขีด)
+  L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
+
+  // 🔹 เข็มทิศ
+  const compass = L.control({ position: 'topright' });
+  compass.onAdd = function() {
+    const div = L.DomUtil.create('div', 'compass');
+    return div;
+  };
+  compass.addTo(map);
+
+  // 📂 โหลดชั้นข้อมูลจาก layers.json
+  fetch("layers/layers.json")
+    .then(r => r.json())
+    .then(files => {
+      files.forEach(file => {
+        const layer = omnivore.kml("layers/" + file)
+          .on("ready", function() {
+            const name = file.replace(".kml", "");
+            const lyr = this;
+
+            // 🖌️ ตรวจประเภท geometry
+            let geomType = null;
+            lyr.eachLayer(l => {
+              if (l.feature && l.feature.geometry) {
+                geomType = l.feature.geometry.type;
+              }
+            });
+
+            // 🔹 ควบคุมการตั้งค่า
+            const div = L.DomUtil.create('div', 'layer-control');
+            div.innerHTML = `<b>${name}</b><br>`;
+            if (geomType && geomType.includes("Point")) {
+              div.innerHTML += `จุด: <input type="range" min="2" max="15" value="6" step="1" class="opacity-slider" id="size-${name}"><br>`;
+            } else {
+              div.innerHTML += `ทึบ: <input type="range" min="0" max="1" step="0.1" value="0.8" class="opacity-slider" id="opacity-${name}"><br>`;
+              div.innerHTML += `หนา: <input type="range" min="1" max="8" step="1" value="3" class="opacity-slider" id="weight-${name}"><br>`;
+            }
+
+            // ✳️ ใส่ event ปรับค่าทันที
+            div.querySelectorAll('input').forEach(inp => {
+              inp.addEventListener('input', () => {
+                lyr.eachLayer(l => {
+                  if (l.setStyle) {
+                    const op = div.querySelector(`#opacity-${name}`)?.value || 0.8;
+                    const wt = div.querySelector(`#weight-${name}`)?.value || 3;
+                    l.setStyle({ opacity: op, fillOpacity: op, weight: wt });
+                  } else if (l.setRadius) {
+                    const sz = div.querySelector(`#size-${name}`)?.value || 6;
+                    l.setRadius(parseFloat(sz));
+                  }
+                });
+              });
+            });
+
+            layerControl.addOverlay(lyr, div);
+          })
+          .addTo(map);
+      });
+    });
+
+  // 📍 ปุ่มรีเซ็ตตำแหน่ง
+  document.getElementById("resetBtn").onclick = () => {
+    map.setView([19.935, 99.791], 13);
+  };
+
+  // 📍 ปุ่มตำแหน่งฉัน
+  let userMarker = null;
+  let locateOn = false;
+  document.getElementById("locateBtn").onclick = () => {
+    if (!locateOn) {
+      map.locate({ setView: true, maxZoom: 16 });
+      locateOn = true;
+      document.getElementById("locateBtn").textContent = "ปิดตำแหน่งฉัน";
+    } else {
+      if (userMarker) map.removeLayer(userMarker);
+      locateOn = false;
+      document.getElementById("locateBtn").textContent = "ตำแหน่งฉัน";
+    }
+  };
+
+  map.on('locationfound', e => {
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.marker(e.latlng).addTo(map);
+  });
+
+  // 📍 แสดงพิกัด E,N (UTM)
+  map.on("mousemove", function(e) {
+    const utm = LLtoUTM(e.latlng.lat, e.latlng.lng);
+    document.getElementById("coord-display").textContent =
+      `E: ${utm.Easting.toFixed(1)}, N: ${utm.Northing.toFixed(1)}`;
+  });
+
+  // 🔢 ฟังก์ชันแปลง LatLong → UTM (Zone 47N สำหรับเชียงราย)
+  function LLtoUTM(lat, lon) {
+    const zone = 47;
+    const a = 6378137.0;
+    const f = 1 / 298.257223563;
+    const k0 = 0.9996;
+    const lonOrigin = (zone - 1) * 6 - 180 + 3;
+    const e = Math.sqrt(f * (2 - f));
+    const N = a / Math.sqrt(1 - e * e * Math.sin(lat * Math.PI/180)**2);
+    const T = Math.tan(lat * Math.PI/180)**2;
+    const C = (e * e / (1 - e * e)) * Math.cos(lat * Math.PI/180)**2;
+    const A = Math.cos(lat * Math.PI/180) * (lon - lonOrigin) * Math.PI/180;
+
+    const M = a*((1 - e*e/4 - 3*e**4/64 - 5*e**6/256)*lat*Math.PI/180
+      - (3*e**2/8 + 3*e**4/32 + 45*e**6/1024)*Math.sin(2*lat*Math.PI/180)
+      + (15*e**4/256 + 45*e**6/1024)*Math.sin(4*lat*Math.PI/180)
+      - (35*e*
